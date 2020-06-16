@@ -20,6 +20,7 @@ namespace GamesToGoAPI.Models
         public string Email { get; set; }
         public string Password { get; set; }
         public int UsertypeId { get; set; }
+        public string Image { get; set; }
 
         public virtual UserType Usertype { get; set; }
         public virtual ICollection<AnswerReport> AnswerReport { get; set; }

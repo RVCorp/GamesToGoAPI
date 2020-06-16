@@ -32,21 +32,36 @@ namespace GamesToGoAPI.Controllers
             IList<Claim> claim = identity.Claims.ToList();
             var userID = claim[3].Value;
             roomID++;
-            Room cRoom = new Room(roomID, userID, _context);
+            Room cRoom = new Room(roomID, _context.User.ToList().Where(x => x.Id == Int32.Parse(userID)).FirstOrDefault());
             rooms.Add(cRoom);
             return cRoom;
         }
 
 
         [HttpPost("JoinRoom/{id}")]
-        public async Task<ActionResult<Room>> JoinRoom(int id)
+        public async Task<ActionResult<List<User>>> JoinRoom(int id)
         {
             var identity = HttpContext.User.Identity as ClaimsIdentity;
             IList<Claim> claim = identity.Claims.ToList();
             var userID = claim[3].Value;
             Room jRoom = rooms.ToList().Where(x => x.id == id).FirstOrDefault();
-            jRoom.JoinRoom(id, userID);
-            return jRoom;
+            jRoom.JoinRoom(_context.User.ToList().Where(x => x.Id == Int32.Parse(userID)).FirstOrDefault());
+            return jRoom.users;
+        }
+
+        [HttpPost("UpdateRoom/{id}")]
+        public string UpdateRoom(int id)
+        {
+            if (true)
+                return "Petición para actualizar la partida enviada";
+            else
+                return "No se pudo realizar la petición para actualizar la partida";
+        }
+
+        [HttpPost("Updates/{id}")]
+        public void CheckUpdates(int id)
+        {
+
         }
 
         public static Room getRoom(int roomID)

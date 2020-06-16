@@ -8,18 +8,18 @@ namespace GamesToGoAPI.Models.GameSettings
     public class Room
     {
         public int id { get; set; }
-        private List<User> users = new List<User>();
-        private GamesToGoContext _context;
-        public Room(int id, String userID, GamesToGoContext context)
+        public List<User> users = new List<User>();
+        public Room(int id, User user)
         {
             this.id = id;
-            _context = context;
-            users.Add(_context.User.ToList().Where(x => x.Id == Int32.Parse(userID)).FirstOrDefault());
+            user.RoomID = id;
+            users.Add(user);
         }
 
-        public void JoinRoom(int id, string userID)
+        public void JoinRoom(User user)
         {
-            users.Add(_context.User.ToList().Where(x => x.Id == Int32.Parse(userID)).FirstOrDefault());
+            user.RoomID = this.id;
+            users.Add(user);
         }
     }
 }
