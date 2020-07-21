@@ -35,8 +35,7 @@ namespace GamesToGoAPI.Migrations
                         .IsRequired()
                         .HasColumnName("details")
                         .HasColumnType("varchar(100)")
-                        .HasAnnotation("MySql:CharSet", "utf8mb4")
-                        .HasAnnotation("MySql:Collation", "utf8mb4_0900_ai_ci");
+                        .HasAnnotation("MySql:CharSet", "utf8mb4");
 
                     b.Property<int>("ReportId")
                         .HasColumnName("reportID")
@@ -67,8 +66,7 @@ namespace GamesToGoAPI.Migrations
                         .IsRequired()
                         .HasColumnName("name")
                         .HasColumnType("varchar(6)")
-                        .HasAnnotation("MySql:CharSet", "utf8mb4")
-                        .HasAnnotation("MySql:Collation", "utf8mb4_0900_ai_ci");
+                        .HasAnnotation("MySql:CharSet", "utf8mb4");
 
                     b.HasKey("Id");
 
@@ -90,8 +88,7 @@ namespace GamesToGoAPI.Migrations
                         .IsRequired()
                         .HasColumnName("description")
                         .HasColumnType("varchar(150)")
-                        .HasAnnotation("MySql:CharSet", "utf8mb4")
-                        .HasAnnotation("MySql:Collation", "utf8mb4_0900_ai_ci");
+                        .HasAnnotation("MySql:CharSet", "utf8mb4");
 
                     b.Property<int>("Maxplayers")
                         .HasColumnName("maxplayers")
@@ -105,8 +102,7 @@ namespace GamesToGoAPI.Migrations
                         .IsRequired()
                         .HasColumnName("name")
                         .HasColumnType("varchar(60)")
-                        .HasAnnotation("MySql:CharSet", "utf8mb4")
-                        .HasAnnotation("MySql:Collation", "utf8mb4_0900_ai_ci");
+                        .HasAnnotation("MySql:CharSet", "utf8mb4");
 
                     b.HasKey("Id");
 
@@ -135,8 +131,7 @@ namespace GamesToGoAPI.Migrations
                         .IsRequired()
                         .HasColumnName("reason")
                         .HasColumnType("varchar(100)")
-                        .HasAnnotation("MySql:CharSet", "utf8mb4")
-                        .HasAnnotation("MySql:Collation", "utf8mb4_0900_ai_ci");
+                        .HasAnnotation("MySql:CharSet", "utf8mb4");
 
                     b.Property<int>("UserId")
                         .HasColumnName("userID")
@@ -164,8 +159,7 @@ namespace GamesToGoAPI.Migrations
                         .IsRequired()
                         .HasColumnName("email")
                         .HasColumnType("varchar(100)")
-                        .HasAnnotation("MySql:CharSet", "utf8mb4")
-                        .HasAnnotation("MySql:Collation", "utf8mb4_0900_ai_ci");
+                        .HasAnnotation("MySql:CharSet", "utf8mb4");
 
                     b.Property<string>("Image")
                         .HasColumnType("longtext CHARACTER SET utf8mb4");
@@ -174,15 +168,13 @@ namespace GamesToGoAPI.Migrations
                         .IsRequired()
                         .HasColumnName("password")
                         .HasColumnType("char(128)")
-                        .HasAnnotation("MySql:CharSet", "utf8mb4")
-                        .HasAnnotation("MySql:Collation", "utf8mb4_0900_ai_ci");
+                        .HasAnnotation("MySql:CharSet", "utf8mb4");
 
                     b.Property<string>("Username")
                         .IsRequired()
                         .HasColumnName("username")
                         .HasColumnType("varchar(20)")
-                        .HasAnnotation("MySql:CharSet", "utf8mb4")
-                        .HasAnnotation("MySql:Collation", "utf8mb4_0900_ai_ci");
+                        .HasAnnotation("MySql:CharSet", "utf8mb4");
 
                     b.Property<int>("UsertypeId")
                         .HasColumnName("usertypeID")
@@ -219,8 +211,7 @@ namespace GamesToGoAPI.Migrations
                         .IsRequired()
                         .HasColumnName("name")
                         .HasColumnType("varchar(5)")
-                        .HasAnnotation("MySql:CharSet", "utf8mb4")
-                        .HasAnnotation("MySql:Collation", "utf8mb4_0900_ai_ci");
+                        .HasAnnotation("MySql:CharSet", "utf8mb4");
 
                     b.HasKey("Id");
 

@@ -20,11 +20,22 @@ namespace GamesToGoAPI.Controllers
     {
         private IConfiguration _config;
         private readonly GamesToGoContext _context;
+        public static List<User> onlineUsers = new List<User>();
 
         public LoginController(IConfiguration config, GamesToGoContext context)
         {
             _config = config;
             _context = context;
+        }
+
+        [HttpPost]
+        public ActionResult<List<User>> GetOnlineUsers()
+        {
+            if(onlineUsers != null)
+            {
+                return onlineUsers;
+            }
+            return BadRequest();
         }
 
         [HttpGet]
@@ -41,6 +52,8 @@ namespace GamesToGoAPI.Controllers
             {
                 var tokenStr = GenerateJWT(user);
                 response = Ok(new { token = tokenStr });
+                User loggedUser = _context.User.Where(u => u.Username == login.Username).FirstOrDefault();
+                onlineUsers.Add(loggedUser);
             }
             return response;
         }
@@ -74,16 +87,6 @@ namespace GamesToGoAPI.Controllers
 
             var encodetoken = new JwtSecurityTokenHandler().WriteToken(token);
             return encodetoken;
-        }
-
-        [Authorize]
-        [HttpPost("Post")]
-        public string Post()
-        {
-            var identity = HttpContext.User.Identity as ClaimsIdentity;
-            IList<Claim> claim = identity.Claims.ToList();
-            var username = claim[0].Value;
-            return "Welcome to:" + username;    
         }
     }
 }

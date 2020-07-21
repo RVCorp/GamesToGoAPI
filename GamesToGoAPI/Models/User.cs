@@ -13,6 +13,7 @@ namespace GamesToGoAPI.Models
             Game = new HashSet<Game>();
             Report = new HashSet<Report>();
         }
+
         [NotMapped]
         public int RoomID { get; set; }
         public int Id { get; set; }

@@ -15,7 +15,6 @@ namespace GamesToGoAPI.Migrations
                         .Annotation("MySql:ValueGenerationStrategy", MySqlValueGenerationStrategy.IdentityColumn),
                     name = table.Column<string>(type: "varchar(6)", nullable: false)
                         .Annotation("MySql:CharSet", "utf8mb4")
-                        .Annotation("MySql:Collation", "utf8mb4_0900_ai_ci")
                 },
                 constraints: table =>
                 {
@@ -30,7 +29,6 @@ namespace GamesToGoAPI.Migrations
                         .Annotation("MySql:ValueGenerationStrategy", MySqlValueGenerationStrategy.IdentityColumn),
                     name = table.Column<string>(type: "varchar(5)", nullable: false)
                         .Annotation("MySql:CharSet", "utf8mb4")
-                        .Annotation("MySql:Collation", "utf8mb4_0900_ai_ci")
                 },
                 constraints: table =>
                 {
@@ -44,14 +42,11 @@ namespace GamesToGoAPI.Migrations
                     id = table.Column<int>(type: "int(11)", nullable: false)
                         .Annotation("MySql:ValueGenerationStrategy", MySqlValueGenerationStrategy.IdentityColumn),
                     username = table.Column<string>(type: "varchar(20)", nullable: false)
-                        .Annotation("MySql:CharSet", "utf8mb4")
-                        .Annotation("MySql:Collation", "utf8mb4_0900_ai_ci"),
+                        .Annotation("MySql:CharSet", "utf8mb4"),
                     email = table.Column<string>(type: "varchar(100)", nullable: false)
-                        .Annotation("MySql:CharSet", "utf8mb4")
-                        .Annotation("MySql:Collation", "utf8mb4_0900_ai_ci"),
+                        .Annotation("MySql:CharSet", "utf8mb4"),
                     password = table.Column<string>(type: "char(128)", nullable: false)
-                        .Annotation("MySql:CharSet", "utf8mb4")
-                        .Annotation("MySql:Collation", "utf8mb4_0900_ai_ci"),
+                        .Annotation("MySql:CharSet", "utf8mb4"),
                     usertypeID = table.Column<int>(type: "int(11)", nullable: false)
                 },
                 constraints: table =>
@@ -72,11 +67,9 @@ namespace GamesToGoAPI.Migrations
                     id = table.Column<int>(type: "int(11)", nullable: false)
                         .Annotation("MySql:ValueGenerationStrategy", MySqlValueGenerationStrategy.IdentityColumn),
                     name = table.Column<string>(type: "varchar(60)", nullable: false)
-                        .Annotation("MySql:CharSet", "utf8mb4")
-                        .Annotation("MySql:Collation", "utf8mb4_0900_ai_ci"),
+                        .Annotation("MySql:CharSet", "utf8mb4"),
                     description = table.Column<string>(type: "varchar(150)", nullable: false)
-                        .Annotation("MySql:CharSet", "utf8mb4")
-                        .Annotation("MySql:Collation", "utf8mb4_0900_ai_ci"),
+                        .Annotation("MySql:CharSet", "utf8mb4"),
                     minplayers = table.Column<int>(type: "int(11)", nullable: false),
                     maxplayers = table.Column<int>(type: "int(11)", nullable: false),
                     creatorID = table.Column<int>(type: "int(11)", nullable: false)
@@ -99,8 +92,7 @@ namespace GamesToGoAPI.Migrations
                     id = table.Column<int>(type: "int(11)", nullable: false)
                         .Annotation("MySql:ValueGenerationStrategy", MySqlValueGenerationStrategy.IdentityColumn),
                     reason = table.Column<string>(type: "varchar(100)", nullable: false)
-                        .Annotation("MySql:CharSet", "utf8mb4")
-                        .Annotation("MySql:Collation", "utf8mb4_0900_ai_ci"),
+                        .Annotation("MySql:CharSet", "utf8mb4"),
                     userID = table.Column<int>(type: "int(11)", nullable: false),
                     gameID = table.Column<int>(type: "int(11)", nullable: false)
                 },
@@ -128,8 +120,7 @@ namespace GamesToGoAPI.Migrations
                     id = table.Column<int>(type: "int(11)", nullable: false)
                         .Annotation("MySql:ValueGenerationStrategy", MySqlValueGenerationStrategy.IdentityColumn),
                     details = table.Column<string>(type: "varchar(100)", nullable: false)
-                        .Annotation("MySql:CharSet", "utf8mb4")
-                        .Annotation("MySql:Collation", "utf8mb4_0900_ai_ci"),
+                        .Annotation("MySql:CharSet", "utf8mb4"),
                     answertypeID = table.Column<int>(type: "int(11)", nullable: false),
                     adminID = table.Column<int>(type: "int(11)", nullable: false),
                     reportID = table.Column<int>(type: "int(11)", nullable: false)

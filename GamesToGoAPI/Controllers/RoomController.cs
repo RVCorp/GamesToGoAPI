@@ -25,14 +25,15 @@ namespace GamesToGoAPI.Controllers
             _context = context;
         }
 
-        [HttpPost("CreateRoom")]
-        public async Task<ActionResult<Room>> CreateRoom()
+        [HttpPost("CreateRoom/Game={gameID}")]
+        public async Task<ActionResult<Room>> CreateRoom( int gameID)
         {
             var identity = HttpContext.User.Identity as ClaimsIdentity;
             IList<Claim> claim = identity.Claims.ToList();
             var userID = claim[3].Value;
+            Game game = _context.Game.Where(g => g.Id == gameID).FirstOrDefault();
             roomID++;
-            Room cRoom = new Room(roomID, _context.User.ToList().Where(x => x.Id == Int32.Parse(userID)).FirstOrDefault());
+            Room cRoom = new Room(roomID, _context.User.ToList().Where(x => x.Id == Int32.Parse(userID)).FirstOrDefault(), game);
             rooms.Add(cRoom);
             return cRoom;
         }
@@ -44,24 +45,9 @@ namespace GamesToGoAPI.Controllers
             var identity = HttpContext.User.Identity as ClaimsIdentity;
             IList<Claim> claim = identity.Claims.ToList();
             var userID = claim[3].Value;
-            Room jRoom = rooms.ToList().Where(x => x.id == id).FirstOrDefault();
+            Room jRoom = getRoom(id);
             jRoom.JoinRoom(_context.User.ToList().Where(x => x.Id == Int32.Parse(userID)).FirstOrDefault());
             return jRoom.users;
-        }
-
-        [HttpPost("UpdateRoom/{id}")]
-        public string UpdateRoom(int id)
-        {
-            if (true)
-                return "Petición para actualizar la partida enviada";
-            else
-                return "No se pudo realizar la petición para actualizar la partida";
-        }
-
-        [HttpPost("Updates/{id}")]
-        public void CheckUpdates(int id)
-        {
-
         }
 
         public static Room getRoom(int roomID)

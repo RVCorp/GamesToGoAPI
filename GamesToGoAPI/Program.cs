@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Hosting;
@@ -13,6 +14,9 @@ namespace GamesToGoAPI
     {
         public static void Main(string[] args)
         {
+            Console.WriteLine(Environment.CurrentDirectory);
+            Console.WriteLine(System.Reflection.Assembly.GetExecutingAssembly().Location);
+            Environment.CurrentDirectory = Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location);
             CreateHostBuilder(args).Build().Run();
         }
 
@@ -20,7 +24,7 @@ namespace GamesToGoAPI
             Host.CreateDefaultBuilder(args)
                 .ConfigureWebHostDefaults(webBuilder =>
                 {
-                    webBuilder.UseStartup<Startup>();
+                    webBuilder.UseStartup<Startup>().UseUrls("http://*:5000");
                 });
     }
 }

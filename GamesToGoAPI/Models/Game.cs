@@ -12,6 +12,7 @@ namespace GamesToGoAPI.Models
 
         public int Id { get; set; }
         public string Name { get; set; }
+        public string Hash { get; set; }
         public string Description { get; set; }
         public int Minplayers { get; set; }
         public int Maxplayers { get; set; }

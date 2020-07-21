@@ -13,9 +13,8 @@ namespace GamesToGoAPI.Models.GameSettings
         public int receiver { get; set; }
         public Room room { get; set; }
 
-        private RoomController rc;
 
-        public Invitation(int transmitterID, int receiverID, Room room, GamesToGoContext context)
+        public Invitation(int transmitterID, int receiverID, Room room)
         {
             transmitter = transmitterID;
             receiver = receiverID;
