@@ -18,7 +18,6 @@ using System.Text;
 using Microsoft.Extensions.Hosting;
 using GamesToGoAPI.Models;
 using Microsoft.AspNetCore.HttpOverrides;
-using GamesToGoAPI.Models.Mail;
 
 namespace GamesToGoAPI
 {
@@ -52,8 +51,6 @@ namespace GamesToGoAPI
                     };
                 });
             services.AddMvc();
-            services.AddSingleton<IEmailConfiguration>(Configuration.GetSection("EmailConfiguration").Get<EmailConfiguration>());
-            services.AddTransient<IEmailService, EmailService>();
             services.AddDbContext<GamesToGoContext>(options => options.UseMySql(Configuration.GetConnectionString("ThisAintTheConnectionString")));
         }
 
