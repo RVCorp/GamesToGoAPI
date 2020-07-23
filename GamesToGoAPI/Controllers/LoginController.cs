@@ -51,8 +51,8 @@ namespace GamesToGoAPI.Controllers
             if(user != null)
             {
                 var tokenStr = GenerateJWT(user);
-                response = Ok(new { token = tokenStr });
-                User loggedUser = _context.User.Where(u => u.Username == login.Username).FirstOrDefault();
+                response = Ok(new { token = tokenStr, id = user.Id });
+                User loggedUser = _context.User.Where(u => u.Username == login.Username || u.Email == login.Email).FirstOrDefault();
                 onlineUsers.Add(loggedUser);
             }
             return response;
@@ -60,7 +60,7 @@ namespace GamesToGoAPI.Controllers
 
         private User AuthenticateUser(User login)
         {
-            User user = _context.User.ToList().Where(x => x.Username == login.Username && x.Password == login.Password).FirstOrDefault();
+            User user = _context.User.ToList().Where(x => x.Username == login.Username || x.Email == login.Username && x.Password == login.Password).FirstOrDefault();
             return user;
         }
 
@@ -81,7 +81,7 @@ namespace GamesToGoAPI.Controllers
                 issuer:_config["Jwt:Issuer"],
                 audience: _config["Jwt:Issuer"],
                 claims,
-                expires:DateTime.Now.AddHours(2),
+                expires:DateTime.Now.AddYears(2),
                 signingCredentials: credentials
                 );
 
