@@ -84,32 +84,31 @@ namespace GamesToGoAPI.Controllers
             return NoContent();
         }
 
-        // POST: api/Games
-        // To protect from overposting attacks, enable the specific properties you want to bind to, for
-        // more details, see https://go.microsoft.com/fwlink/?linkid=2123754.
-        [HttpPost]
-        public async Task<ActionResult<Game>> PostGame(Game game)
-        {
-            _context.Game.Add(game);
-            await _context.SaveChangesAsync();
-
-            return CreatedAtAction("GetGame", new { id = game.Id }, game);
-        }
 
         // DELETE: api/Games/5
         [HttpDelete("{id}")]
         public async Task<ActionResult<Game>> DeleteGame(int id)
         {
+            var identity = HttpContext.User.Identity as ClaimsIdentity;
+            IList<Claim> claim = identity.Claims.ToList();
+            var userID = claim[3].Value;
+            UserPasswordless up = new UserPasswordless(_context.User.Where(u => u.Id == Int32.Parse(userID)).FirstOrDefault());
             var game = await _context.Game.FindAsync(id);
             if (game == null)
             {
                 return NotFound();
             }
-
-            _context.Game.Remove(game);
-            await _context.SaveChangesAsync();
-
-            return game;
+            else if(up.Id != game.CreatorId)
+            {
+                return BadRequest();
+            }
+            else
+            {
+                _context.Game.Remove(game);
+                await _context.SaveChangesAsync();
+                System.IO.File.Delete($"Games/{game.Hash}");
+                return Ok();
+            }
         }
 
         [HttpPost("UploadFile")]

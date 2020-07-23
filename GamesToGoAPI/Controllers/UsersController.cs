@@ -34,15 +34,22 @@ namespace GamesToGoAPI.Controllers
         // GET: api/Users
         [HttpGet]
         [Authorize]
-        public async Task<ActionResult<IEnumerable<User>>> GetUser()
+        public async Task<ActionResult<IEnumerable<UserPasswordless>>> GetUser()
         {
-            return await _context.User.ToListAsync();
+            List<UserPasswordless> up = new List<UserPasswordless>();
+            UserPasswordless nup;
+            foreach(var user in await _context.User.ToListAsync())
+            {
+                nup = new UserPasswordless(user);
+                up.Add(nup);
+            }
+            return up;
         }
 
         // GET: api/Users/5
         [HttpGet("{id}")]
         [Authorize]
-        public async Task<ActionResult<User>> GetUser(int id)
+        public async Task<ActionResult<UserPasswordless>> GetUser(int id)
         {
             var user = await _context.User.FindAsync(id);
 
@@ -50,8 +57,8 @@ namespace GamesToGoAPI.Controllers
             {
                 return NotFound();
             }
-
-            return user;
+            UserPasswordless up = new UserPasswordless(user);
+            return up;
         }
 
         // PUT: api/Users/5
@@ -91,12 +98,17 @@ namespace GamesToGoAPI.Controllers
         // To protect from overposting attacks, enable the specific properties you want to bind to, for
         // more details, see https://go.microsoft.com/fwlink/?linkid=2123754.
         [HttpPost]
-        public async Task<ActionResult<User>> PostUser(User user)
+        public async Task<ActionResult<UserPasswordless>> PostUser(User user)
         {
-            user.UsertypeId = 1;
-            _context.User.Add(user);
-            await _context.SaveChangesAsync();
-            return CreatedAtAction("GetUser", new { id = user.Id }, user);
+            if(!UserExists(user.Username, user.Email))
+            {
+                user.UsertypeId = 1;
+                _context.User.Add(user);
+                await _context.SaveChangesAsync();
+                UserPasswordless up = new UserPasswordless(user);
+                return CreatedAtAction("GetUser", up);
+            }
+            return BadRequest();
         }
 
         [HttpPost("UploadImage")]
@@ -144,7 +156,7 @@ namespace GamesToGoAPI.Controllers
         // DELETE: api/Users/5
         [HttpDelete("{id}")]
         [Authorize]
-        public async Task<ActionResult<User>> DeleteUser(int id)
+        public async Task<ActionResult<UserPasswordless>> DeleteUser(int id)
         {
             var user = await _context.User.FindAsync(id);
             if (user == null)
@@ -155,11 +167,13 @@ namespace GamesToGoAPI.Controllers
             _context.User.Remove(user);
             await _context.SaveChangesAsync();
 
-            return user;
+            UserPasswordless up = new UserPasswordless(user);
+
+            return up;
         }
 
         [HttpPost("SendInvitation")]
-        public async Task<ActionResult<User>> SendInvitation(int idUser, int idRoom)
+        public async Task<ActionResult<UserPasswordless>> SendInvitation(int idUser, int idRoom)
         {
             var identity = HttpContext.User.Identity as ClaimsIdentity;
             IList<Claim> claim = identity.Claims.ToList();
@@ -167,7 +181,8 @@ namespace GamesToGoAPI.Controllers
             User user = _context.User.ToList().Where(x => x.Id == idUser).FirstOrDefault();
             Invitation invitation = new Invitation(Int32.Parse(userID), user.Id, RoomController.getRoom(idRoom));
             invitations.Add(invitation);
-            return user;
+            UserPasswordless up = new UserPasswordless(user);
+            return up;
         }
 
         [HttpPost("Updates")]
@@ -184,6 +199,11 @@ namespace GamesToGoAPI.Controllers
         private bool UserExists(int id)
         {
             return _context.User.Any(e => e.Id == id);
+        }
+
+        private bool UserExists(string username, string email)
+        {
+            return _context.User.Any(e => e.Username == username || e.Email == email);
         }
     }
 }
