@@ -60,7 +60,7 @@ namespace GamesToGoAPI.Controllers
 
         private User AuthenticateUser(User login)
         {
-            User user = _context.User.ToList().Where(x => x.Username == login.Username || x.Email == login.Username && x.Password == login.Password).FirstOrDefault();
+            User user = _context.User.ToList().Where(x => (x.Username == login.Username || x.Email == login.Username) && x.Password == login.Password).FirstOrDefault();
             return user;
         }
 
