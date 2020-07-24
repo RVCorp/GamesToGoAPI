@@ -20,7 +20,7 @@ namespace GamesToGoAPI.Controllers
     {
         private IConfiguration _config;
         private readonly GamesToGoContext _context;
-        public static List<User> onlineUsers = new List<User>();
+        public static List<UserPasswordless> onlineUsers = new List<UserPasswordless>();
 
         public LoginController(IConfiguration config, GamesToGoContext context)
         {
@@ -28,8 +28,9 @@ namespace GamesToGoAPI.Controllers
             _context = context;
         }
 
-        [HttpPost]
-        public ActionResult<List<User>> GetOnlineUsers()
+        [HttpGet("OnlineUsers")]
+        [Authorize]
+        public ActionResult<List<UserPasswordless>> GetOnlineUsers()
         {
             if(onlineUsers != null)
             {
@@ -52,8 +53,9 @@ namespace GamesToGoAPI.Controllers
             {
                 var tokenStr = GenerateJWT(user);
                 response = Ok(new { token = tokenStr, id = user.Id });
-                User loggedUser = _context.User.Where(u => u.Username == login.Username || u.Email == login.Email).FirstOrDefault();
-                onlineUsers.Add(loggedUser);
+                User loggedUser = _context.User.Where(u => u.Username == login.Username || u.Email == login.Username).FirstOrDefault();
+                UserPasswordless up = new UserPasswordless(loggedUser);
+                onlineUsers.Add(up);
             }
             return response;
         }
