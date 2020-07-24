@@ -122,6 +122,7 @@ namespace GamesToGoAPI.Controllers
             string description = f.description;
             string minP = f.minP;
             string maxP = f.maxP;
+            string image = f.imageName;
             var file = f.File;
             var filePath = Path.Combine("App_Data", file.FileName);
             if (file.Length > 0)
@@ -166,6 +167,7 @@ namespace GamesToGoAPI.Controllers
                 game.Description = description;
                 game.Minplayers = Int32.Parse(minP);
                 game.Maxplayers = Int32.Parse(maxP);
+                game.Image = image;
                 var identity = HttpContext.User.Identity as ClaimsIdentity;
                 IList<Claim> claim = identity.Claims.ToList();
                 var id = claim[3].Value;
@@ -180,6 +182,7 @@ namespace GamesToGoAPI.Controllers
                 game.Description = description;
                 game.Minplayers = Int32.Parse(minP);
                 game.Maxplayers = Int32.Parse(maxP);
+                game.Image = image;
             }
             _context.SaveChanges();
             return Ok(new { status = true, ID = game.Id });
