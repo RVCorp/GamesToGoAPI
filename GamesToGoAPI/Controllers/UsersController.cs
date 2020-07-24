@@ -100,20 +100,15 @@ namespace GamesToGoAPI.Controllers
         [HttpPost]
         public async Task<ActionResult<UserPasswordless>> PostUser(User user)
         {
-            if(!UserExistsUsername(user.Username))
+            if(!UserExists(user.Username, user.Email))
             {
-                if(!UserExistsEmail(user.Email))
-                {
-                    user.UsertypeId = 1;
-                    _context.User.Add(user);
-                    await _context.SaveChangesAsync();
-                    UserPasswordless up = new UserPasswordless(user);
-                    return CreatedAtAction("GetUser", up);
-                }
-                return BadRequest("Email");
+                user.UsertypeId = 1;
+                _context.User.Add(user);
+                await _context.SaveChangesAsync();
+                UserPasswordless up = new UserPasswordless(user);
+                return CreatedAtAction("GetUser", up);
             }
-            else
-                return BadRequest("User");
+            return BadRequest("");
         }
 
         [HttpPost("UploadImage")]
@@ -206,13 +201,10 @@ namespace GamesToGoAPI.Controllers
             return _context.User.Any(e => e.Id == id);
         }
 
-        private bool UserExistsUsername(string username)
+        private bool UserExists(string username, string email)
         {
-            return _context.User.Any(e => e.Username == username );
+            return _context.User.Any(e => e.Username == username || e.Email == email);
         }
-        private bool UserExistsEmail(string email)
-        {
-            return _context.User.Any(e => e.Email == email);
-        }
+
     }
 }
