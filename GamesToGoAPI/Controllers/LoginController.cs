@@ -81,7 +81,7 @@ namespace GamesToGoAPI.Controllers
                 issuer:_config["Jwt:Issuer"],
                 audience: _config["Jwt:Issuer"],
                 claims,
-                expires:DateTime.Now.AddYears(2),
+                expires:DateTime.Now.AddMinutes(20),
                 signingCredentials: credentials
                 );
 
