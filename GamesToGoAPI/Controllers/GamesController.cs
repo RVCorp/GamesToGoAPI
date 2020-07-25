@@ -31,13 +31,6 @@ namespace GamesToGoAPI.Controllers
             _context = context;
         }
 
-        // GET: api/Games
-        [HttpGet]
-        public async Task<ActionResult<IEnumerable<Game>>> GetGame()
-        {
-            return await _context.Game.ToListAsync();
-        }
-
         // GET: api/Games/5
         [HttpGet("{id}")]
         public async Task<ActionResult<Game>> GetGame(int id)
@@ -123,6 +116,7 @@ namespace GamesToGoAPI.Controllers
             string minP = f.minP;
             string maxP = f.maxP;
             string image = f.imageName;
+            string le = f.LastEdited;
             var file = f.File;
             var filePath = Path.Combine("App_Data", file.FileName);
             if (file.Length > 0)
@@ -168,6 +162,7 @@ namespace GamesToGoAPI.Controllers
                 game.Minplayers = Int32.Parse(minP);
                 game.Maxplayers = Int32.Parse(maxP);
                 game.Image = image;
+                game.LastEdited = le;
                 var identity = HttpContext.User.Identity as ClaimsIdentity;
                 IList<Claim> claim = identity.Claims.ToList();
                 var id = claim[3].Value;
@@ -183,6 +178,7 @@ namespace GamesToGoAPI.Controllers
                 game.Minplayers = Int32.Parse(minP);
                 game.Maxplayers = Int32.Parse(maxP);
                 game.Image = image;
+                game.LastEdited = le;
             }
             _context.SaveChanges();
             return Ok(new { status = true, ID = game.Id });

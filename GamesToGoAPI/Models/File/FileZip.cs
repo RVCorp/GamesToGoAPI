@@ -14,6 +14,7 @@ namespace GamesToGoAPI.Models.File
         public string minP { get; set; }
         public string maxP { get; set; }
         public string imageName { get; set; }
+        public string LastEdited { get; set; }
         public IFormFile File { get; set; }
     }
 }
