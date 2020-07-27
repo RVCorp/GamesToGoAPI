@@ -121,7 +121,7 @@ namespace GamesToGoAPI.Controllers
             string image = f.imageName;
             string le = f.LastEdited;
             var file = f.File;
-            var filePath = Path.Combine("App_Data", file.FileName);
+            var filePath = Path.Combine("App_Data", f.FileName);
             if (file.Length > 0)
             {
                 using (var fileStream = file.OpenReadStream())
@@ -130,7 +130,7 @@ namespace GamesToGoAPI.Controllers
                     {
                         foreach (ZipEntry e in zip)
                         {
-                            e.Extract(@$"App_Data/{file.FileName.Replace(".zip", "")}");
+                            e.Extract(@$"App_Data/{f.FileName.Replace(".zip", "")}");
                         }
                     }
                 }
@@ -160,7 +160,7 @@ namespace GamesToGoAPI.Controllers
             {
                 game = new Game();
                 game.Name = name;
-                game.Hash = file.FileName.Replace(".zip", "");
+                game.Hash = f.FileName.Replace(".zip", "");
                 game.Description = description;
                 game.Minplayers = Int32.Parse(minP);
                 game.Maxplayers = Int32.Parse(maxP);
@@ -176,7 +176,7 @@ namespace GamesToGoAPI.Controllers
             {
                 game = _context.Game.Where(g => g.Id == Int32.Parse(ID)).FirstOrDefault();
                 game.Name = name;
-                game.Hash = file.FileName.Replace(".zip", "");
+                game.Hash = f.FileName.Replace(".zip", "");
                 game.Description = description;
                 game.Minplayers = Int32.Parse(minP);
                 game.Maxplayers = Int32.Parse(maxP);
