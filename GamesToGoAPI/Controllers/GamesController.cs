@@ -21,7 +21,7 @@ namespace GamesToGoAPI.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+    //[Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
     public class GamesController : ControllerBase
     {
         private readonly GamesToGoContext _context;
@@ -91,7 +91,7 @@ namespace GamesToGoAPI.Controllers
             {
                 return NotFound();
             }
-            else if(up.Id != game.CreatorId)
+            else if (up.Id != game.CreatorId)
             {
                 return BadRequest();
             }
@@ -186,7 +186,7 @@ namespace GamesToGoAPI.Controllers
 
 
 
-        [HttpGet("Download/{id}")]
+        [HttpGet("DownloadProject/{id}")]
         public IActionResult DownloadFile(int id)
         {
             string hash = _context.Game.Where(g => g.Id == id).FirstOrDefault().Hash;
@@ -202,11 +202,11 @@ namespace GamesToGoAPI.Controllers
                     for (int i = 0; i < lines.Length; i++)
                     {
                         string[] info = lines[i].Split('=');
-                        if(info[0] == "Files")
+                        if (info[0] == "Files")
                         {
                             for (int j = 0; j < Int32.Parse(info[1]); j++)
                             {
-                                zip.AddFile($"Games/{lines[i + j + 1]}","");
+                                zip.AddFile($"Games/{lines[i + j + 1]}", "");
                             }
                             break;
                         }
@@ -218,6 +218,24 @@ namespace GamesToGoAPI.Controllers
                 stream.Seek(0, SeekOrigin.Begin);
                 return File(stream, "application/octet-stream", hash + ".zip");
             }
+        }
+
+        [HttpGet("DownloadFile/{hash}")]
+        public IActionResult DownloadSpecificFile(string hash)
+        {
+            string GFile = $"Games/{hash}";
+            var stream = new MemoryStream();
+            if (System.IO.File.Exists(GFile))
+            {
+                using (FileStream fs = System.IO.File.OpenRead(GFile))
+                {
+                    fs.CopyTo(stream);
+                }
+            }
+            else
+                return NotFound();
+            stream.Seek(0, SeekOrigin.Begin);
+            return File(stream, "application/octet-stream", hash + ".zip");
         }
 
         [HttpGet("AllGames")]
