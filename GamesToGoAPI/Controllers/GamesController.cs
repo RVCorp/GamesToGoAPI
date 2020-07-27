@@ -21,7 +21,6 @@ namespace GamesToGoAPI.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    //[Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
     public class GamesController : ControllerBase
     {
         private readonly GamesToGoContext _context;
@@ -33,6 +32,7 @@ namespace GamesToGoAPI.Controllers
 
         // GET: api/Games/5
         [HttpGet("{id}")]
+        [Authorize]
         public async Task<ActionResult<Game>> GetGame(int id)
         {
             var game = await _context.Game.FindAsync(id);
@@ -49,6 +49,7 @@ namespace GamesToGoAPI.Controllers
         // To protect from overposting attacks, enable the specific properties you want to bind to, for
         // more details, see https://go.microsoft.com/fwlink/?linkid=2123754.
         [HttpPut("{id}")]
+        [Authorize]
         public async Task<IActionResult> PutGame(int id, Game game)
         {
             if (id != game.Id)
@@ -80,6 +81,7 @@ namespace GamesToGoAPI.Controllers
 
         // DELETE: api/Games/5
         [HttpDelete("{id}")]
+        [Authorize]
         public async Task<ActionResult<Game>> DeleteGame(int id)
         {
             var identity = HttpContext.User.Identity as ClaimsIdentity;
@@ -105,6 +107,7 @@ namespace GamesToGoAPI.Controllers
         }
 
         [HttpPost("UploadFile")]
+        [Authorize]
         public async Task<ActionResult> UploadFile([FromForm]FileZip f)
         {
             Directory.CreateDirectory("App_Data");
@@ -187,6 +190,7 @@ namespace GamesToGoAPI.Controllers
 
 
         [HttpGet("DownloadProject/{id}")]
+        [Authorize]
         public IActionResult DownloadFile(int id)
         {
             string hash = _context.Game.Where(g => g.Id == id).FirstOrDefault().Hash;
@@ -239,6 +243,7 @@ namespace GamesToGoAPI.Controllers
         }
 
         [HttpGet("AllGames")]
+        [Authorize]
         public async Task<ActionResult<List<Game>>> GetGames()
         {
             var identity = HttpContext.User.Identity as ClaimsIdentity;
