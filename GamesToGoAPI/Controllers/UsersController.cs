@@ -131,14 +131,11 @@ namespace GamesToGoAPI.Controllers
             return Ok(new { status = true, message = "Image Posted Successfully" });
         }
 
-        [HttpGet("DownloadImage")]
-        [Authorize]
-        public IActionResult DownloadImage()
+        [HttpGet("DownloadImage/{id}")]
+        public IActionResult DownloadImage(int id)
         {
-            var identity = HttpContext.User.Identity as ClaimsIdentity;
-            IList<Claim> claim = identity.Claims.ToList();
-            var userID = claim[3].Value;
-            User u = _context.User.Where(u => u.Id == Int32.Parse(userID)).FirstOrDefault();
+            var userID = id;
+            User u = _context.User.Where(u => u.Id == id).FirstOrDefault();
             string iFile = $"UserImages/{u.Image}";
             if (System.IO.File.Exists(iFile))
             {
