@@ -130,14 +130,10 @@ namespace GamesToGoAPI.Controllers
             return Ok(new { status = true, message = "Image Posted Successfully" });
         }
 
-        [HttpGet("DownloadImage")]
-        [Authorize]
-        public async Task<IActionResult> DownloadImage()
+        [HttpGet("DownloadImage/{id}")]
+        public async Task<IActionResult> DownloadImage(int id)
         {
-            var identity = HttpContext.User.Identity as ClaimsIdentity;
-            IList<Claim> claim = identity.Claims.ToList();
-            var userID = claim[3].Value;
-            User u = await _context.User.FindAsync(int.Parse(userID));
+            User u = await _context.User.FindAsync(id);
             string iFile = $"UserImages/{u.Image}";
             if (System.IO.File.Exists(iFile))
             {
