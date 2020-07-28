@@ -122,15 +122,11 @@ namespace GamesToGoAPI.Controllers
             {
                 if (file.Length > 0)
                 {
-                    using (var fileStream = file.OpenReadStream())
+                    using var fileStream = file.OpenReadStream();
+                    using ZipFile zip = ZipFile.Read(fileStream);
+                    foreach (ZipEntry e in zip)
                     {
-                        using (ZipFile zip = ZipFile.Read(fileStream))
-                        {
-                            foreach (ZipEntry e in zip)
-                            {
-                                e.Extract(@$"App_Data/{f.FileName.Replace(".zip", "")}");
-                            }
-                        }
+                        e.Extract(@$"App_Data/{f.FileName.Replace(".zip", "")}");
                     }
 
                 }
@@ -164,14 +160,16 @@ namespace GamesToGoAPI.Controllers
             Directory.Delete(filePath.Replace(".zip", ""));
             if (int.Parse(ID) == -1)
             {
-                game = new Game();
-                game.Name = name;
-                game.Hash = f.FileName.Replace(".zip", "");
-                game.Description = description;
-                game.Minplayers = int.Parse(minP);
-                game.Maxplayers = int.Parse(maxP);
-                game.Image = image;
-                game.LastEdited = le;
+                game = new Game
+                {
+                    Name = name,
+                    Hash = f.FileName.Replace(".zip", ""),
+                    Description = description,
+                    Minplayers = int.Parse(minP),
+                    Maxplayers = int.Parse(maxP),
+                    Image = image,
+                    LastEdited = le
+                };
                 var identity = HttpContext.User.Identity as ClaimsIdentity;
                 IList<Claim> claim = identity.Claims.ToList();
                 var id = claim[3].Value;
@@ -202,35 +200,33 @@ namespace GamesToGoAPI.Controllers
             string GFile = $"Games/{hash}";
 
 
-            using (ZipFile zip = new ZipFile())
+            using ZipFile zip = new ZipFile();
+            var stream = new MemoryStream();
+            if (System.IO.File.Exists(GFile))
             {
-                var stream = new MemoryStream();
-                if (System.IO.File.Exists(GFile))
+                await Task.Run(() =>
                 {
-                    await Task.Run(() =>
+                    zip.AddFile(GFile, "");
+                    string[] lines = System.IO.File.ReadAllLines(GFile);
+                    for (int i = 0; i < lines.Length; i++)
                     {
-                        zip.AddFile(GFile, "");
-                        string[] lines = System.IO.File.ReadAllLines(GFile);
-                        for (int i = 0; i < lines.Length; i++)
+                        string[] info = lines[i].Split('=');
+                        if (info[0] == "Files")
                         {
-                            string[] info = lines[i].Split('=');
-                            if (info[0] == "Files")
+                            for (int j = 0; j < Int32.Parse(info[1]); j++)
                             {
-                                for (int j = 0; j < Int32.Parse(info[1]); j++)
-                                {
-                                    zip.AddFile($"Games/{lines[i + j + 1]}", "");
-                                }
-                                break;
+                                zip.AddFile($"Games/{lines[i + j + 1]}", "");
                             }
+                            break;
                         }
-                        zip.Save(stream);
-                    });
-                }
-                else
-                    return NotFound();
-                stream.Seek(0, SeekOrigin.Begin);
-                return File(stream, "application/octet-stream", hash + ".zip");
+                    }
+                    zip.Save(stream);
+                });
             }
+            else
+                return NotFound();
+            stream.Seek(0, SeekOrigin.Begin);
+            return File(stream, "application/octet-stream", hash + ".zip");
         }
 
         [HttpGet("DownloadFile/{hash}")]
@@ -240,10 +236,8 @@ namespace GamesToGoAPI.Controllers
             var stream = new MemoryStream();
             if (System.IO.File.Exists(GFile))
             {
-                using (FileStream fs = System.IO.File.OpenRead(GFile))
-                {
-                    await Task.Run(() => fs.CopyTo(stream));
-                }
+                using FileStream fs = System.IO.File.OpenRead(GFile);
+                await Task.Run(() => fs.CopyTo(stream));
             }
             else
                 return NotFound();

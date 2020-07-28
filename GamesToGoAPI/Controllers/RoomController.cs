@@ -1,13 +1,13 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Security.Claims;
-using System.Threading.Tasks;
-using GamesToGoAPI.Models;
+﻿using GamesToGoAPI.Models;
 using GamesToGoAPI.Models.GameSettings;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Security.Claims;
+using System.Threading.Tasks;
 
 namespace GamesToGoAPI.Controllers
 {
@@ -26,7 +26,7 @@ namespace GamesToGoAPI.Controllers
         }
 
         [HttpPost("CreateRoom/Game={gameID}")]
-        public async Task<ActionResult<Room>> CreateRoom( int gameID)
+        public async Task<ActionResult<Room>> CreateRoom(int gameID)
         {
             var identity = HttpContext.User.Identity as ClaimsIdentity;
             IList<Claim> claim = identity.Claims.ToList();
@@ -45,14 +45,14 @@ namespace GamesToGoAPI.Controllers
             var identity = HttpContext.User.Identity as ClaimsIdentity;
             IList<Claim> claim = identity.Claims.ToList();
             var userID = claim[3].Value;
-            Room jRoom = getRoom(id);
+            Room jRoom = GetRoom(id);
             jRoom.JoinRoom(await _context.User.FindAsync(int.Parse(userID)));
             return jRoom.users;
         }
 
-        public static Room getRoom(int roomID)
+        public static Room GetRoom(int roomID)
         {
-            return rooms.ToList().Where(x => x.id == roomID).FirstOrDefault();
+            return rooms.ToList().Where(x => x.ID == roomID).FirstOrDefault();
         }
     }
 }

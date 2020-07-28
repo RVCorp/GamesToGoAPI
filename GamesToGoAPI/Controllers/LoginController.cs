@@ -1,16 +1,14 @@
-﻿using System;
+﻿using GamesToGoAPI.Models;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Configuration;
+using Microsoft.IdentityModel.Tokens;
+using System;
 using System.Collections.Generic;
 using System.IdentityModel.Tokens.Jwt;
 using System.Linq;
 using System.Security.Claims;
 using System.Text;
-using System.Threading.Tasks;
-using GamesToGoAPI.Models;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Configuration;
-using Microsoft.IdentityModel.Tokens;
 
 namespace GamesToGoAPI.Controllers
 {
@@ -18,7 +16,7 @@ namespace GamesToGoAPI.Controllers
     [ApiController]
     public class LoginController : ControllerBase
     {
-        private IConfiguration _config;
+        private readonly IConfiguration _config;
         private readonly GamesToGoContext _context;
         public static List<UserPasswordless> onlineUsers = new List<UserPasswordless>();
 
@@ -32,7 +30,7 @@ namespace GamesToGoAPI.Controllers
         [Authorize]
         public ActionResult<List<UserPasswordless>> GetOnlineUsers()
         {
-            if(onlineUsers != null)
+            if (onlineUsers != null)
             {
                 return onlineUsers;
             }
@@ -42,14 +40,16 @@ namespace GamesToGoAPI.Controllers
         [HttpGet]
         public IActionResult Login(string username, string pass)
         {
-            User login = new User();
-            login.Username = username;
-            login.Password = pass;
+            User login = new User
+            {
+                Username = username,
+                Password = pass
+            };
             IActionResult response = Unauthorized();
 
             var user = AuthenticateUser(login);
 
-            if(user != null)
+            if (user != null)
             {
                 var tokenStr = GenerateJWT(user);
                 response = Ok(new { token = tokenStr, id = user.Id });
@@ -80,10 +80,10 @@ namespace GamesToGoAPI.Controllers
             };
 
             var token = new JwtSecurityToken(
-                issuer:_config["Jwt:Issuer"],
+                issuer: _config["Jwt:Issuer"],
                 audience: _config["Jwt:Issuer"],
                 claims,
-                expires:DateTime.Now.AddMinutes(20),
+                expires: DateTime.Now.AddMinutes(20),
                 signingCredentials: credentials
                 );
 

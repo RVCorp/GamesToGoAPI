@@ -1,13 +1,10 @@
 ﻿using Microsoft.AspNetCore.Http;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 
 namespace GamesToGoAPI.Models.File
 {
     public class FileZip
     {
+#pragma warning disable IDE1006 // Estilos de nombres
         public string ID { get; set; }
         public string Name { get; set; }
         public string description { get; set; }
@@ -17,5 +14,6 @@ namespace GamesToGoAPI.Models.File
         public string LastEdited { get; set; }
         public IFormFile File { get; set; }
         public string FileName { get; set; }
+#pragma warning restore IDE1006 // Estilos de nombres
     }
 }
