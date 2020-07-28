@@ -31,7 +31,7 @@ namespace GamesToGoAPI.Controllers
             var identity = HttpContext.User.Identity as ClaimsIdentity;
             IList<Claim> claim = identity.Claims.ToList();
             var userID = claim[3].Value;
-            Game game = _context.Game.Where(g => g.Id == gameID).FirstOrDefault();
+            Game game = await _context.Game.FindAsync(gameID);
             roomID++;
             Room cRoom = new Room(roomID, _context.User.ToList().Where(x => x.Id == Int32.Parse(userID)).FirstOrDefault(), game);
             rooms.Add(cRoom);
@@ -46,7 +46,7 @@ namespace GamesToGoAPI.Controllers
             IList<Claim> claim = identity.Claims.ToList();
             var userID = claim[3].Value;
             Room jRoom = getRoom(id);
-            jRoom.JoinRoom(_context.User.ToList().Where(x => x.Id == Int32.Parse(userID)).FirstOrDefault());
+            jRoom.JoinRoom(await _context.User.FindAsync(int.Parse(userID)));
             return jRoom.users;
         }
 

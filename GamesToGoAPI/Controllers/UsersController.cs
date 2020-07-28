@@ -7,7 +7,6 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using GamesToGoAPI.Models;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
 using System.Security.Claims;
 using GamesToGoAPI.Models.GameSettings;
 using Microsoft.Extensions.Configuration;
@@ -113,13 +112,13 @@ namespace GamesToGoAPI.Controllers
 
         [HttpPost("UploadImage")]
         [Authorize]
-        public async Task <ActionResult> UploadImage ([FromForm] ImageFile image)
+        public async Task<ActionResult> UploadImage ([FromForm] ImageFile image)
         {
             Directory.CreateDirectory("UserImages");
             var identity = HttpContext.User.Identity as ClaimsIdentity;
             IList<Claim> claim = identity.Claims.ToList();
             var userID = claim[3].Value;
-            User u = _context.User.Where(u => u.Id == Int32.Parse(userID)).FirstOrDefault();
+            User u = _context.User.Where(u => u.Id == int.Parse(userID)).FirstOrDefault();
             var ifile = image.File;
             var filePath = Path.Combine("UserImages", u.Username + Path.GetExtension(ifile.FileName));
             using (var filestream = new FileStream(filePath, FileMode.Create))
@@ -133,24 +132,22 @@ namespace GamesToGoAPI.Controllers
 
         [HttpGet("DownloadImage")]
         [Authorize]
-        public IActionResult DownloadImage()
+        public async Task<IActionResult> DownloadImage()
         {
             var identity = HttpContext.User.Identity as ClaimsIdentity;
             IList<Claim> claim = identity.Claims.ToList();
             var userID = claim[3].Value;
-            User u = _context.User.Where(u => u.Id == Int32.Parse(userID)).FirstOrDefault();
+            User u = await _context.User.FindAsync(int.Parse(userID));
             string iFile = $"UserImages/{u.Image}";
             if (System.IO.File.Exists(iFile))
             {
                 var stream = new MemoryStream();
-                stream.Write(System.IO.File.ReadAllBytes(iFile));
+                stream.Write(await System.IO.File.ReadAllBytesAsync(iFile));
                 stream.Seek(0, SeekOrigin.Begin);
                 return File(stream, "application/octet-stream", u.Image);
-
             }
             else
                 return NotFound();
-
         }
 
         // DELETE: api/Users/5
@@ -173,26 +170,26 @@ namespace GamesToGoAPI.Controllers
         }
 
         [HttpPost("SendInvitation")]
-        public async Task<ActionResult<UserPasswordless>> SendInvitation(int idUser, int idRoom)
+        public ActionResult<UserPasswordless> SendInvitation(int idUser, int idRoom)
         {
             var identity = HttpContext.User.Identity as ClaimsIdentity;
             IList<Claim> claim = identity.Claims.ToList();
             var userID = claim[3].Value;
-            User user = _context.User.ToList().Where(x => x.Id == idUser).FirstOrDefault();
-            Invitation invitation = new Invitation(Int32.Parse(userID), user.Id, RoomController.getRoom(idRoom));
+            User user =  _context.User.ToListAsync().Result.Where(x => x.Id == idUser).FirstOrDefault();
+            Invitation invitation = new Invitation(int.Parse(userID), user.Id, RoomController.getRoom(idRoom));
             invitations.Add(invitation);
             UserPasswordless up = new UserPasswordless(user);
             return up;
         }
 
         [HttpPost("Updates")]
-        public async Task<ActionResult<List<Invitation>>> UpdateData()
+        public ActionResult<List<Invitation>> UpdateData()
         {
             var identity = HttpContext.User.Identity as ClaimsIdentity;
             IList<Claim> claim = identity.Claims.ToList();
             var userID = claim[3].Value;
             List<Invitation> i;
-            i = invitations.Where(x => x.receiver == Int32.Parse(userID)).ToList();
+            i = invitations.Where(x => x.receiver == int.Parse(userID)).ToList();
             return i;
         }
 
