@@ -120,6 +120,7 @@ namespace GamesToGoAPI.Controllers
             string maxP = f.maxP;
             string image = f.imageName;
             string le = f.LastEdited;
+            int status = f.Status;
             var file = f.File;
             var filePath = Path.Combine("App_Data", f.FileName);
             if (file.Length > 0)
@@ -166,6 +167,7 @@ namespace GamesToGoAPI.Controllers
                 game.Maxplayers = Int32.Parse(maxP);
                 game.Image = image;
                 game.LastEdited = le;
+                game.Status = status;
                 var identity = HttpContext.User.Identity as ClaimsIdentity;
                 IList<Claim> claim = identity.Claims.ToList();
                 var id = claim[3].Value;
@@ -182,6 +184,7 @@ namespace GamesToGoAPI.Controllers
                 game.Maxplayers = Int32.Parse(maxP);
                 game.Image = image;
                 game.LastEdited = le;
+                game.Status = status;
             }
             _context.SaveChanges();
             return Ok(new { status = true, ID = game.Id });
@@ -252,6 +255,18 @@ namespace GamesToGoAPI.Controllers
             List<Game> i;
             i = _context.Game.Where(x => x.CreatorId == Int32.Parse(userID)).ToList();
             return i;
+        }
+
+        [HttpGet("AllPublishedGames")]
+        [Authorize]
+        public async Task<ActionResult<List<Game>>> GetPublishedGames()
+        {
+            var identity = HttpContext.User.Identity as ClaimsIdentity;
+            IList<Claim> claim = identity.Claims.ToList();
+            var userID = claim[3].Value;
+            List<Game> g;
+            g = _context.Game.Where(x => x.CreatorId == Int32.Parse(userID) && x.Status == 3).ToList();
+            return g;
         }
 
         private bool GameExists(int id)
