@@ -269,6 +269,15 @@ namespace GamesToGoAPI.Controllers
             return g;
         }
 
+        [HttpGet("AllPublishedGamesToGoGames")]
+        [Authorize]
+        public async Task<ActionResult<List<Game>>> GetAllPublishedGames()
+        { 
+            List<Game> g;
+            g = _context.Game.Where(x => x.Status == 3).ToList();
+            return g;
+        }
+
         private bool GameExists(int id)
         {
             return _context.Game.Any(e => e.Id == id);

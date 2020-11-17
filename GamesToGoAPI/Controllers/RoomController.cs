@@ -26,14 +26,14 @@ namespace GamesToGoAPI.Controllers
         }
 
         [HttpPost("CreateRoom/Game={gameID}")]
-        public async Task<ActionResult<Room>> CreateRoom( int gameID)
+        public async Task<ActionResult<Room>> CreateRoom( int gameID, string gameName)
         {
             var identity = HttpContext.User.Identity as ClaimsIdentity;
             IList<Claim> claim = identity.Claims.ToList();
             var userID = claim[3].Value;
             Game game = _context.Game.Where(g => g.Id == gameID).FirstOrDefault();
             roomID++;
-            Room cRoom = new Room(roomID, _context.User.ToList().Where(x => x.Id == Int32.Parse(userID)).FirstOrDefault(), game);
+            Room cRoom = new Room(roomID, _context.User.ToList().Where(x => x.Id == Int32.Parse(userID)).FirstOrDefault(), game, gameName);
             rooms.Add(cRoom);
             return cRoom;
         }
