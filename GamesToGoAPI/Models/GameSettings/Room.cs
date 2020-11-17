@@ -1,28 +1,23 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
+﻿using System.Collections.Generic;
 
 namespace GamesToGoAPI.Models.GameSettings
 {
     public class Room
     {
-        public int id { get; set; }
-        public string name { get; set; }
-        public Game game { get; set; }
+        public int ID { get; set; }
+        public Game Game { get; set; }
         public List<User> users = new List<User>();
         public Room(int id, User user, Game game, string gameName)
         {
-            this.id = id;
-            name = gameName;
+            ID = id;
             user.RoomID = id;
             users.Add(user);
-            this.game = game;
+            Game = game;
         }
 
         public void JoinRoom(User user)
         {
-            user.RoomID = this.id;
+            user.RoomID = ID;
             users.Add(user);
         }
     }

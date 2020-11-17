@@ -9,16 +9,16 @@ namespace GamesToGoAPI.Models.GameSettings
 {
     public class Invitation
     {
-        public int transmitter { get; set; }
-        public int receiver { get; set; }
-        public Room room { get; set; }
+        public int Transmitter { get; set; }
+        public int Receiver { get; set; }
+        public Room Room { get; set; }
 
 
         public Invitation(int transmitterID, int receiverID, Room room)
         {
-            transmitter = transmitterID;
-            receiver = receiverID;
-            this.room = room;
+            Transmitter = transmitterID;
+            Receiver = receiverID;
+            Room = room;
         }
     }
 }

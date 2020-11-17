@@ -1,7 +1,6 @@
 ﻿using GamesToGoAPI.Models;
 using GamesToGoAPI.Models.File;
 using Ionic.Zip;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -10,9 +9,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Net;
-using System.Net.Http;
-using System.Net.Http.Headers;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Threading.Tasks;
@@ -108,7 +104,7 @@ namespace GamesToGoAPI.Controllers
 
         [HttpPost("UploadFile")]
         [Authorize]
-        public async Task<ActionResult> UploadFile([FromForm]FileZip f)
+        public async Task<ActionResult> UploadFile([FromForm] FileZip f)
         {
             Directory.CreateDirectory("App_Data");
             Directory.CreateDirectory("Games");
@@ -123,33 +119,39 @@ namespace GamesToGoAPI.Controllers
             int status = f.Status;
             var file = f.File;
             var filePath = Path.Combine("App_Data", f.FileName);
-            if (file.Length > 0)
+            await Task.Run(() =>
             {
-                using (var fileStream = file.OpenReadStream())
+                if (file.Length > 0)
                 {
-                    using (ZipFile zip = ZipFile.Read((fileStream)))
+                    using var fileStream = file.OpenReadStream();
+                    using ZipFile zip = ZipFile.Read(fileStream);
+                    foreach (ZipEntry e in zip)
                     {
-                        foreach (ZipEntry e in zip)
-                        {
-                            e.Extract(@$"App_Data/{f.FileName.Replace(".zip", "")}");
-                        }
+                        e.Extract(@$"App_Data/{f.FileName.Replace(".zip", "")}");
                     }
-                }
 
-            }
+                }
+            });
+
             foreach (var inFile in Directory.GetFiles(filePath.Replace(".zip", "")))
             {
-                if (HashBytes(System.IO.File.ReadAllBytes(inFile)) == Path.GetFileName(inFile))
+                string fileHash = string.Empty;
+                await Task.Run(() => fileHash = HashBytes(System.IO.File.ReadAllBytes(inFile)));
+                if (fileHash == Path.GetFileName(inFile))
                 {
-                    if (!System.IO.File.Exists($"Games/{Path.GetFileName(inFile)}"))
+                    await Task.Run(() =>
                     {
-                        System.IO.File.Move(inFile, $"Games/{Path.GetFileName(inFile)}");
-                        System.IO.File.Delete(inFile);
-                    }
-                    else
-                    {
-                        System.IO.File.Delete(inFile);
-                    }
+
+                        if (!System.IO.File.Exists($"Games/{Path.GetFileName(inFile)}"))
+                        {
+                            System.IO.File.Move(inFile, $"Games/{Path.GetFileName(inFile)}");
+                            System.IO.File.Delete(inFile);
+                        }
+                        else
+                        {
+                            System.IO.File.Delete(inFile);
+                        }
+                    });
                 }
                 else
                 {
@@ -157,52 +159,54 @@ namespace GamesToGoAPI.Controllers
                 }
             }
             Directory.Delete(filePath.Replace(".zip", ""));
-            if (Int32.Parse(ID) == -1)
+            if (int.Parse(ID) == -1)
             {
-                game = new Game();
-                game.Name = name;
-                game.Hash = f.FileName.Replace(".zip", "");
-                game.Description = description;
-                game.Minplayers = Int32.Parse(minP);
-                game.Maxplayers = Int32.Parse(maxP);
-                game.Image = image;
-                game.LastEdited = le;
-                game.Status = status;
+                game = new Game
+                {
+                    Name = name,
+                    Hash = f.FileName.Replace(".zip", ""),
+                    Description = description,
+                    Minplayers = int.Parse(minP),
+                    Maxplayers = int.Parse(maxP),
+                    Image = image,
+                    LastEdited = le
+                };
                 var identity = HttpContext.User.Identity as ClaimsIdentity;
                 IList<Claim> claim = identity.Claims.ToList();
                 var id = claim[3].Value;
-                game.Creator = _context.User.Where(u => u.Id == Int32.Parse(id)).FirstOrDefault();
-                _context.Game.Add(game);
+                game.Creator = _context.User.Where(u => u.Id == int.Parse(id)).FirstOrDefault();
+                await _context.Game.AddAsync(game);
             }
             else
             {
-                game = _context.Game.Where(g => g.Id == Int32.Parse(ID)).FirstOrDefault();
+                game = _context.Game.Where(g => g.Id == int.Parse(ID)).FirstOrDefault();
                 game.Name = name;
                 game.Hash = f.FileName.Replace(".zip", "");
                 game.Description = description;
-                game.Minplayers = Int32.Parse(minP);
-                game.Maxplayers = Int32.Parse(maxP);
+                game.Minplayers = int.Parse(minP);
+                game.Maxplayers = int.Parse(maxP);
                 game.Image = image;
                 game.LastEdited = le;
                 game.Status = status;
             }
-            _context.SaveChanges();
+
+            await _context.SaveChangesAsync();
             return Ok(new { status = true, ID = game.Id });
         }
 
-
-
         [HttpGet("DownloadProject/{id}")]
         [Authorize]
-        public IActionResult DownloadFile(int id)
+        public async Task<IActionResult> DownloadFile(int id)
         {
             string hash = _context.Game.Where(g => g.Id == id).FirstOrDefault().Hash;
             string GFile = $"Games/{hash}";
 
-            using (ZipFile zip = new ZipFile())
+
+            using ZipFile zip = new ZipFile();
+            var stream = new MemoryStream();
+            if (System.IO.File.Exists(GFile))
             {
-                var stream = new MemoryStream();
-                if (System.IO.File.Exists(GFile))
+                await Task.Run(() =>
                 {
                     zip.AddFile(GFile, "");
                     string[] lines = System.IO.File.ReadAllLines(GFile);
@@ -219,25 +223,23 @@ namespace GamesToGoAPI.Controllers
                         }
                     }
                     zip.Save(stream);
-                }
-                else
-                    return NotFound();
-                stream.Seek(0, SeekOrigin.Begin);
-                return File(stream, "application/octet-stream", hash + ".zip");
+                });
             }
+            else
+                return NotFound();
+            stream.Seek(0, SeekOrigin.Begin);
+            return File(stream, "application/octet-stream", hash + ".zip");
         }
 
         [HttpGet("DownloadFile/{hash}")]
-        public IActionResult DownloadSpecificFile(string hash)
+        public async Task<IActionResult> DownloadSpecificFile(string hash)
         {
             string GFile = $"Games/{hash}";
             var stream = new MemoryStream();
             if (System.IO.File.Exists(GFile))
             {
-                using (FileStream fs = System.IO.File.OpenRead(GFile))
-                {
-                    fs.CopyTo(stream);
-                }
+                using FileStream fs = System.IO.File.OpenRead(GFile);
+                await Task.Run(() => fs.CopyTo(stream));
             }
             else
                 return NotFound();
@@ -253,7 +255,7 @@ namespace GamesToGoAPI.Controllers
             IList<Claim> claim = identity.Claims.ToList();
             var userID = claim[3].Value;
             List<Game> i;
-            i = _context.Game.Where(x => x.CreatorId == Int32.Parse(userID)).ToList();
+            i = await _context.Game.Where(x => x.CreatorId == int.Parse(userID)).ToListAsync();
             return i;
         }
 
@@ -282,6 +284,7 @@ namespace GamesToGoAPI.Controllers
         {
             return _context.Game.Any(e => e.Id == id);
         }
+
         public static string HashBytes(byte[] bytes) //Obtiene SHA1 de una secuencia de bytes
         {
             using SHA1Managed hasher = new SHA1Managed();

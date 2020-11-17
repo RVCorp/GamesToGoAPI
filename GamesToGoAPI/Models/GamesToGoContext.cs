@@ -1,9 +1,4 @@
-﻿using System;
-using System.ComponentModel.DataAnnotations.Schema;
-using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Metadata;
-using Microsoft.Extensions.Configuration;
+﻿using Microsoft.EntityFrameworkCore;
 
 namespace GamesToGoAPI.Models
 {
@@ -24,10 +19,9 @@ namespace GamesToGoAPI.Models
         public virtual DbSet<Report> Report { get; set; }
         public virtual DbSet<User> User { get; set; }
         public virtual DbSet<UserType> UserType { get; set; }
- 
+
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {
-            
         }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)

@@ -1,13 +1,13 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Security.Claims;
-using System.Threading.Tasks;
-using GamesToGoAPI.Models;
+﻿using GamesToGoAPI.Models;
 using GamesToGoAPI.Models.GameSettings;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Security.Claims;
+using System.Threading.Tasks;
 
 namespace GamesToGoAPI.Controllers
 {
@@ -26,12 +26,12 @@ namespace GamesToGoAPI.Controllers
         }
 
         [HttpPost("CreateRoom/Game={gameID}")]
-        public async Task<ActionResult<Room>> CreateRoom( int gameID, string gameName)
+        public async Task<ActionResult<Room>> CreateRoom(int gameID)
         {
             var identity = HttpContext.User.Identity as ClaimsIdentity;
             IList<Claim> claim = identity.Claims.ToList();
             var userID = claim[3].Value;
-            Game game = _context.Game.Where(g => g.Id == gameID).FirstOrDefault();
+            Game game = await _context.Game.FindAsync(gameID);
             roomID++;
             Room cRoom = new Room(roomID, _context.User.ToList().Where(x => x.Id == Int32.Parse(userID)).FirstOrDefault(), game, gameName);
             rooms.Add(cRoom);
@@ -45,14 +45,14 @@ namespace GamesToGoAPI.Controllers
             var identity = HttpContext.User.Identity as ClaimsIdentity;
             IList<Claim> claim = identity.Claims.ToList();
             var userID = claim[3].Value;
-            Room jRoom = getRoom(id);
-            jRoom.JoinRoom(_context.User.ToList().Where(x => x.Id == Int32.Parse(userID)).FirstOrDefault());
+            Room jRoom = GetRoom(id);
+            jRoom.JoinRoom(await _context.User.FindAsync(int.Parse(userID)));
             return jRoom.users;
         }
 
-        public static Room getRoom(int roomID)
+        public static Room GetRoom(int roomID)
         {
-            return rooms.ToList().Where(x => x.id == roomID).FirstOrDefault();
+            return rooms.ToList().Where(x => x.ID == roomID).FirstOrDefault();
         }
     }
 }

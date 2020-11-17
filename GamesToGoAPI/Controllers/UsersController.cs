@@ -1,18 +1,16 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
+﻿using GamesToGoAPI.Models;
+using GamesToGoAPI.Models.File;
+using GamesToGoAPI.Models.GameSettings;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using GamesToGoAPI.Models;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using System.Security.Claims;
-using GamesToGoAPI.Models.GameSettings;
 using Microsoft.Extensions.Configuration;
-using GamesToGoAPI.Models.File;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
+using System.Security.Claims;
+using System.Threading.Tasks;
 
 namespace GamesToGoAPI.Controllers
 {
@@ -21,7 +19,7 @@ namespace GamesToGoAPI.Controllers
 
     public class UsersController : ControllerBase
     {
-        IConfiguration _config;
+        private readonly IConfiguration _config;
         private readonly GamesToGoContext _context;
         public static List<Invitation> invitations = new List<Invitation>();
 
@@ -38,7 +36,7 @@ namespace GamesToGoAPI.Controllers
         {
             List<UserPasswordless> up = new List<UserPasswordless>();
             UserPasswordless nup;
-            foreach(var user in await _context.User.ToListAsync())
+            foreach (var user in await _context.User.ToListAsync())
             {
                 nup = new UserPasswordless(user);
                 up.Add(nup);
@@ -100,7 +98,7 @@ namespace GamesToGoAPI.Controllers
         [HttpPost]
         public async Task<ActionResult<UserPasswordless>> PostUser(User user)
         {
-            if(!UserExists(user.Username, user.Email))
+            if (!UserExists(user.Username, user.Email))
             {
                 user.UsertypeId = 1;
                 _context.User.Add(user);
@@ -113,13 +111,13 @@ namespace GamesToGoAPI.Controllers
 
         [HttpPost("UploadImage")]
         [Authorize]
-        public async Task <ActionResult> UploadImage ([FromForm] ImageFile image)
+        public async Task<ActionResult> UploadImage([FromForm] ImageFile image)
         {
             Directory.CreateDirectory("UserImages");
             var identity = HttpContext.User.Identity as ClaimsIdentity;
             IList<Claim> claim = identity.Claims.ToList();
             var userID = claim[3].Value;
-            User u = _context.User.Where(u => u.Id == Int32.Parse(userID)).FirstOrDefault();
+            User u = _context.User.Where(u => u.Id == int.Parse(userID)).FirstOrDefault();
             var ifile = image.File;
             var filePath = Path.Combine("UserImages", u.Username + Path.GetExtension(ifile.FileName));
             using (var filestream = new FileStream(filePath, FileMode.Create))
@@ -132,22 +130,19 @@ namespace GamesToGoAPI.Controllers
         }
 
         [HttpGet("DownloadImage/{id}")]
-        public IActionResult DownloadImage(int id)
+        public async Task<IActionResult> DownloadImage(int id)
         {
-            var userID = id;
-            User u = _context.User.Where(u => u.Id == id).FirstOrDefault();
+            User u = await _context.User.FindAsync(id);
             string iFile = $"UserImages/{u.Image}";
             if (System.IO.File.Exists(iFile))
             {
                 var stream = new MemoryStream();
-                stream.Write(System.IO.File.ReadAllBytes(iFile));
+                stream.Write(await System.IO.File.ReadAllBytesAsync(iFile));
                 stream.Seek(0, SeekOrigin.Begin);
                 return File(stream, "application/octet-stream", u.Image);
-
             }
             else
                 return NotFound();
-
         }
 
         // DELETE: api/Users/5
@@ -170,26 +165,26 @@ namespace GamesToGoAPI.Controllers
         }
 
         [HttpPost("SendInvitation")]
-        public async Task<ActionResult<UserPasswordless>> SendInvitation(int idUser, int idRoom)
+        public ActionResult<UserPasswordless> SendInvitation(int idUser, int idRoom)
         {
             var identity = HttpContext.User.Identity as ClaimsIdentity;
             IList<Claim> claim = identity.Claims.ToList();
             var userID = claim[3].Value;
-            User user = _context.User.ToList().Where(x => x.Id == idUser).FirstOrDefault();
-            Invitation invitation = new Invitation(Int32.Parse(userID), user.Id, RoomController.getRoom(idRoom));
+            User user = _context.User.ToListAsync().Result.Where(x => x.Id == idUser).FirstOrDefault();
+            Invitation invitation = new Invitation(int.Parse(userID), user.Id, RoomController.GetRoom(idRoom));
             invitations.Add(invitation);
             UserPasswordless up = new UserPasswordless(user);
             return up;
         }
 
         [HttpPost("Updates")]
-        public async Task<ActionResult<List<Invitation>>> UpdateData()
+        public ActionResult<List<Invitation>> UpdateData()
         {
             var identity = HttpContext.User.Identity as ClaimsIdentity;
             IList<Claim> claim = identity.Claims.ToList();
             var userID = claim[3].Value;
             List<Invitation> i;
-            i = invitations.Where(x => x.receiver == Int32.Parse(userID)).ToList();
+            i = invitations.Where(x => x.Receiver == int.Parse(userID)).ToList();
             return i;
         }
 

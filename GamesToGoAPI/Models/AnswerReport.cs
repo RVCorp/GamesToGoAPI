@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-
-namespace GamesToGoAPI.Models
+﻿namespace GamesToGoAPI.Models
 {
     public partial class AnswerReport
     {
