@@ -259,7 +259,7 @@ namespace GamesToGoAPI.Controllers
             return i;
         }
 
-        [HttpGet("AllPublishedGames")]
+        [HttpGet("UserPublishedGames")]
         [Authorize]
         public async Task<ActionResult<List<Game>>> GetPublishedGames()
         {
@@ -271,7 +271,7 @@ namespace GamesToGoAPI.Controllers
             return g;
         }
 
-        [HttpGet("AllPublishedGamesToGoGames")]
+        [HttpGet("AllPublishedGames")]
         [Authorize]
         public async Task<ActionResult<List<Game>>> GetAllPublishedGames()
         { 

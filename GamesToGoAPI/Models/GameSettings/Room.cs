@@ -7,7 +7,7 @@ namespace GamesToGoAPI.Models.GameSettings
         public int ID { get; set; }
         public Game Game { get; set; }
         public List<User> users = new List<User>();
-        public Room(int id, User user, Game game, string gameName)
+        public Room(int id, User user, Game game)
         {
             ID = id;
             user.RoomID = id;

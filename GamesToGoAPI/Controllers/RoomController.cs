@@ -33,7 +33,7 @@ namespace GamesToGoAPI.Controllers
             var userID = claim[3].Value;
             Game game = await _context.Game.FindAsync(gameID);
             roomID++;
-            Room cRoom = new Room(roomID, _context.User.ToList().Where(x => x.Id == Int32.Parse(userID)).FirstOrDefault(), game, gameName);
+            Room cRoom = new Room(roomID, _context.User.ToList().Where(x => x.Id == Int32.Parse(userID)).FirstOrDefault(), game);
             rooms.Add(cRoom);
             return cRoom;
         }
