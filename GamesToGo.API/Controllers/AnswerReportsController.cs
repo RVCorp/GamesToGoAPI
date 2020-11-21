@@ -1,9 +1,7 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using GamesToGo.API.Models;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authorization;
@@ -14,27 +12,24 @@ namespace GamesToGo.API.Controllers
     [Route("api/[controller]")]
     [ApiController]
     [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
-    public class AnswerReportsController : ControllerBase
+    public class AnswerReportsController : UserAwareController
     {
-        private readonly GamesToGoContext _context;
-
-        public AnswerReportsController(GamesToGoContext context)
+        public AnswerReportsController(GamesToGoContext context) : base(context)
         {
-            _context = context;
         }
-
+        
         // GET: api/AnswerReports
         [HttpGet]
         public async Task<ActionResult<IEnumerable<AnswerReport>>> GetAnswerReport()
         {
-            return await _context.AnswerReport.ToListAsync();
+            return await Context.AnswerReport.ToListAsync();
         }
 
         // GET: api/AnswerReports/5
         [HttpGet("{id}")]
         public async Task<ActionResult<AnswerReport>> GetAnswerReport(int id)
         {
-            var answerReport = await _context.AnswerReport.FindAsync(id);
+            var answerReport = await Context.AnswerReport.FindAsync(id);
 
             if (answerReport == null)
             {
@@ -55,11 +50,11 @@ namespace GamesToGo.API.Controllers
                 return BadRequest();
             }
 
-            _context.Entry(answerReport).State = EntityState.Modified;
+            Context.Entry(answerReport).State = EntityState.Modified;
 
             try
             {
-                await _context.SaveChangesAsync();
+                await Context.SaveChangesAsync();
             }
             catch (DbUpdateConcurrencyException)
             {
@@ -82,8 +77,8 @@ namespace GamesToGo.API.Controllers
         [HttpPost]
         public async Task<ActionResult<AnswerReport>> PostAnswerReport(AnswerReport answerReport)
         {
-            _context.AnswerReport.Add(answerReport);
-            await _context.SaveChangesAsync();
+            Context.AnswerReport.Add(answerReport);
+            await Context.SaveChangesAsync();
 
             return CreatedAtAction("GetAnswerReport", new { id = answerReport.Id }, answerReport);
         }
@@ -92,21 +87,21 @@ namespace GamesToGo.API.Controllers
         [HttpDelete("{id}")]
         public async Task<ActionResult<AnswerReport>> DeleteAnswerReport(int id)
         {
-            var answerReport = await _context.AnswerReport.FindAsync(id);
+            var answerReport = await Context.AnswerReport.FindAsync(id);
             if (answerReport == null)
             {
                 return NotFound();
             }
 
-            _context.AnswerReport.Remove(answerReport);
-            await _context.SaveChangesAsync();
+            Context.AnswerReport.Remove(answerReport);
+            await Context.SaveChangesAsync();
 
             return answerReport;
         }
 
         private bool AnswerReportExists(int id)
         {
-            return _context.AnswerReport.Any(e => e.Id == id);
+            return Context.AnswerReport.Any(e => e.Id == id);
         }
     }
 }

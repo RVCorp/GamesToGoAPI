@@ -1,26 +1,35 @@
 ﻿using System.ComponentModel.DataAnnotations.Schema;
 using GamesToGo.API.GameExecution;
+using Newtonsoft.Json;
 
 namespace GamesToGo.API.Models
 {
     public class UserPasswordless
     {
+        [JsonIgnore] 
+        public readonly User User;
         public UserPasswordless(User user)
         {
-            this.Room = user.Room;
-            this.Id = user.Id;
-            this.Username = user.Username;
-            this.Email = user.Email;
-            this.UsertypeId = user.UsertypeId;
-            this.Image = user.Image;
+            User = user;
         }
 
+        [JsonIgnore]
         [NotMapped]
-        public Room Room { get; set; }
-        public int Id { get; set; }
-        public string Username { get; set; }
-        public string Email { get; set; }
-        public int UsertypeId { get; set; }
-        public string Image { get; set; }
+        public Room Room
+        {
+            get => User.Room;
+            set => User.Room = value;
+        }
+
+        public int Id => User.Id;
+        public string Username => User.Username;
+        public string Email => User.Email;
+        public int UsertypeId => User.UsertypeId;
+
+        public string Image
+        {
+            get => User.Image;
+            set => User.Image = value;
+        }
     }
 }

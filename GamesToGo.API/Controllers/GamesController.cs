@@ -1,13 +1,11 @@
 ﻿using Ionic.Zip;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Threading.Tasks;
 using GamesToGo.API.Models;
@@ -17,13 +15,10 @@ namespace GamesToGo.API.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    public class GamesController : ControllerBase
+    public class GamesController : UserAwareController
     {
-        private readonly GamesToGoContext _context;
-
-        public GamesController(GamesToGoContext context)
+        public GamesController(GamesToGoContext context) : base(context)
         {
-            _context = context;
         }
 
         // GET: api/Games/5
@@ -31,7 +26,7 @@ namespace GamesToGo.API.Controllers
         [Authorize]
         public async Task<ActionResult<Game>> GetGame(int id)
         {
-            var game = await _context.Game.FindAsync(id);
+            var game = await Context.Game.FindAsync(id);
 
             if (game == null)
             {
@@ -53,11 +48,11 @@ namespace GamesToGo.API.Controllers
                 return BadRequest();
             }
 
-            _context.Entry(game).State = EntityState.Modified;
+            Context.Entry(game).State = EntityState.Modified;
 
             try
             {
-                await _context.SaveChangesAsync();
+                await Context.SaveChangesAsync();
             }
             catch (DbUpdateConcurrencyException)
             {
@@ -80,26 +75,20 @@ namespace GamesToGo.API.Controllers
         [Authorize]
         public async Task<ActionResult<Game>> DeleteGame(int id)
         {
-            var identity = HttpContext.User.Identity as ClaimsIdentity;
-            IList<Claim> claim = identity.Claims.ToList();
-            var userID = claim[3].Value;
-            UserPasswordless up = new UserPasswordless(_context.User.Where(u => u.Id == Int32.Parse(userID)).FirstOrDefault());
-            var game = await _context.Game.FindAsync(id);
+            var game = await Context.Game.FindAsync(id);
             if (game == null)
             {
                 return NotFound();
             }
-            else if (up.Id != game.CreatorId)
+            if (LoggedUser.Id != game.CreatorId)
             {
                 return BadRequest();
             }
-            else
-            {
-                _context.Game.Remove(game);
-                await _context.SaveChangesAsync();
-                System.IO.File.Delete($"Games/{game.Hash}");
-                return Ok();
-            }
+            
+            Context.Game.Remove(game);
+            await Context.SaveChangesAsync();
+            System.IO.File.Delete($"Games/{game.Hash}");
+            return Ok();
         }
 
         [HttpPost("UploadFile")]
@@ -109,14 +98,13 @@ namespace GamesToGo.API.Controllers
             Directory.CreateDirectory("App_Data");
             Directory.CreateDirectory("Games");
             Game game;
-            string ID = f.ID;
+            string gameID = f.ID;
             string name = f.Name;
             string description = f.description;
             string minP = f.minP;
             string maxP = f.maxP;
             string image = f.imageName;
             string le = f.LastEdited;
-            int status = f.Status;
             var file = f.File;
             var filePath = Path.Combine("App_Data", f.FileName);
             await Task.Run(() =>
@@ -159,57 +147,43 @@ namespace GamesToGo.API.Controllers
                 }
             }
             Directory.Delete(filePath.Replace(".zip", ""));
-            if (int.Parse(ID) == -1)
+            if (int.Parse(gameID) == -1 || (game = await Context.Game.FindAsync(int.Parse(gameID))) == null)
             {
-                game = new Game
-                {
-                    Name = name,
-                    Hash = f.FileName.Replace(".zip", ""),
-                    Description = description,
-                    Minplayers = int.Parse(minP),
-                    Maxplayers = int.Parse(maxP),
-                    Image = image,
-                    LastEdited = le
-                };
-                var identity = HttpContext.User.Identity as ClaimsIdentity;
-                IList<Claim> claim = identity.Claims.ToList();
-                var id = claim[3].Value;
-                game.Creator = _context.User.Where(u => u.Id == int.Parse(id)).FirstOrDefault();
-                await _context.Game.AddAsync(game);
+                game = new Game { Creator = LoggedUser.User };
+                await Context.Game.AddAsync(game);
             }
-            else
-            {
-                game = _context.Game.Where(g => g.Id == int.Parse(ID)).FirstOrDefault();
-                game.Name = name;
-                game.Hash = f.FileName.Replace(".zip", "");
-                game.Description = description;
-                game.Minplayers = int.Parse(minP);
-                game.Maxplayers = int.Parse(maxP);
-                game.Image = image;
-                game.LastEdited = le;
-                game.Status = status;
-            }
+            
+            game.Name = name;
+            game.Hash = f.FileName.Replace(".zip", "");
+            game.Description = description;
+            game.Minplayers = int.Parse(minP);
+            game.Maxplayers = int.Parse(maxP);
+            game.Image = image;
+            game.LastEdited = le;
 
-            await _context.SaveChangesAsync();
-            return Ok(new { ID = game.Id });
+            game.Status = 3;
+
+            await Context.SaveChangesAsync();
+            
+            return Ok(new { ID = game.Id, game.Status });
         }
 
         [HttpGet("DownloadProject/{id}")]
         [Authorize]
         public async Task<IActionResult> DownloadFile(int id)
         {
-            string hash = _context.Game.Where(g => g.Id == id).FirstOrDefault().Hash;
-            string GFile = $"Games/{hash}";
+            var game = await Context.Game.FindAsync(id);
+            string gameFile = $"Games/{game.Hash}";
 
 
             using ZipFile zip = new ZipFile();
             var stream = new MemoryStream();
-            if (System.IO.File.Exists(GFile))
+            if (System.IO.File.Exists(gameFile))
             {
                 await Task.Run(() =>
                 {
-                    zip.AddFile(GFile, "");
-                    string[] lines = System.IO.File.ReadAllLines(GFile);
+                    zip.AddFile(gameFile, "");
+                    string[] lines = System.IO.File.ReadAllLines(gameFile);
                     for (int i = 0; i < lines.Length; i++)
                     {
                         string[] info = lines[i].Split('=');
@@ -228,7 +202,7 @@ namespace GamesToGo.API.Controllers
             else
                 return NotFound();
             stream.Seek(0, SeekOrigin.Begin);
-            return File(stream, "application/octet-stream", hash + ".zip");
+            return File(stream, "application/octet-stream", game.Hash + ".zip");
         }
 
         [HttpGet("DownloadFile/{hash}")]
@@ -238,7 +212,7 @@ namespace GamesToGo.API.Controllers
             var stream = new MemoryStream();
             if (System.IO.File.Exists(gFile))
             {
-                using FileStream fs = System.IO.File.OpenRead(gFile);
+                await using FileStream fs = System.IO.File.OpenRead(gFile);
                 await Task.Run(() => fs.CopyTo(stream));
             }
             else
@@ -251,11 +225,8 @@ namespace GamesToGo.API.Controllers
         [Authorize]
         public async Task<ActionResult<List<Game>>> GetGames()
         {
-            var identity = HttpContext.User.Identity as ClaimsIdentity;
-            IList<Claim> claim = identity.Claims.ToList();
-            var userID = claim[3].Value;
             List<Game> i;
-            i = await _context.Game.Where(x => x.CreatorId == int.Parse(userID)).ToListAsync();
+            i = await Context.Game.Where(x => x.CreatorId == LoggedUser.Id).ToListAsync();
             return i;
         }
 
@@ -263,11 +234,8 @@ namespace GamesToGo.API.Controllers
         [Authorize]
         public async Task<ActionResult<List<Game>>> GetPublishedGames()
         {
-            var identity = HttpContext.User.Identity as ClaimsIdentity;
-            IList<Claim> claim = identity.Claims.ToList();
-            var userID = claim[3].Value;
             List<Game> g;
-            g = _context.Game.Where(x => x.CreatorId == Int32.Parse(userID) && x.Status == 3).ToList();
+            g = await Context.Game.Where(x => x.CreatorId == LoggedUser.Id && x.Status == 3).ToListAsync();
             return g;
         }
 
@@ -276,13 +244,13 @@ namespace GamesToGo.API.Controllers
         public async Task<ActionResult<List<Game>>> GetAllPublishedGames()
         { 
             List<Game> g;
-            g = _context.Game.Where(x => x.Status == 3).ToList();
+            g = await Context.Game.Where(x => x.Status == 3).ToListAsync();
             return g;
         }
 
         private bool GameExists(int id)
         {
-            return _context.Game.Any(e => e.Id == id);
+            return Context.Game.Any(e => e.Id == id);
         }
 
         public static string HashBytes(byte[] bytes) //Obtiene SHA1 de una secuencia de bytes

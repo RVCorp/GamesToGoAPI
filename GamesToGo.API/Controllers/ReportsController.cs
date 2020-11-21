@@ -12,27 +12,24 @@ namespace GamesToGo.API.Controllers
     [Route("api/[controller]")]
     [ApiController]
     [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
-    public class ReportsController : ControllerBase
+    public class ReportsController : UserAwareController
     {
-        private readonly GamesToGoContext _context;
-
-        public ReportsController(GamesToGoContext context)
+        public ReportsController(GamesToGoContext context) : base(context)
         {
-            _context = context;
         }
 
         // GET: api/Reports
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Report>>> GetReport()
         {
-            return await _context.Report.ToListAsync();
+            return await Context.Report.ToListAsync();
         }
 
         // GET: api/Reports/5
         [HttpGet("{id}")]
         public async Task<ActionResult<Report>> GetReport(int id)
         {
-            var report = await _context.Report.FindAsync(id);
+            var report = await Context.Report.FindAsync(id);
 
             if (report == null)
             {
@@ -53,11 +50,11 @@ namespace GamesToGo.API.Controllers
                 return BadRequest();
             }
 
-            _context.Entry(report).State = EntityState.Modified;
+            Context.Entry(report).State = EntityState.Modified;
 
             try
             {
-                await _context.SaveChangesAsync();
+                await Context.SaveChangesAsync();
             }
             catch (DbUpdateConcurrencyException)
             {
@@ -80,8 +77,8 @@ namespace GamesToGo.API.Controllers
         [HttpPost]
         public async Task<ActionResult<Report>> PostReport(Report report)
         {
-            _context.Report.Add(report);
-            await _context.SaveChangesAsync();
+            Context.Report.Add(report);
+            await Context.SaveChangesAsync();
 
             return CreatedAtAction("GetReport", new { id = report.Id }, report);
         }
@@ -90,21 +87,21 @@ namespace GamesToGo.API.Controllers
         [HttpDelete("{id}")]
         public async Task<ActionResult<Report>> DeleteReport(int id)
         {
-            var report = await _context.Report.FindAsync(id);
+            var report = await Context.Report.FindAsync(id);
             if (report == null)
             {
                 return NotFound();
             }
 
-            _context.Report.Remove(report);
-            await _context.SaveChangesAsync();
+            Context.Report.Remove(report);
+            await Context.SaveChangesAsync();
 
             return report;
         }
 
         private bool ReportExists(int id)
         {
-            return _context.Report.Any(e => e.Id == id);
+            return Context.Report.Any(e => e.Id == id);
         }
     }
 }

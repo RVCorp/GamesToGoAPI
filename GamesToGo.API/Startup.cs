@@ -43,8 +43,13 @@ namespace GamesToGo.API
                         IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(Configuration["Jwt:Key"]))
                     };
                 });
-            services.AddMvc();
-            services.AddDbContext<GamesToGoContext>(options => options.UseMySql(Configuration.GetConnectionString("ThisAintTheConnectionString")));
+            services.AddMvc()
+                .AddNewtonsoftJson();
+            services.AddDbContext<GamesToGoContext>(options =>
+            {
+                options.UseLazyLoadingProxies()
+                    .UseMySql(Configuration.GetConnectionString("ThisAintTheConnectionString"));
+            });
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.

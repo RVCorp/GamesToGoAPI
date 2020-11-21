@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations.Schema;
 using GamesToGo.API.GameExecution;
+using Newtonsoft.Json;
 
 namespace GamesToGo.API.Models
 {
@@ -23,8 +24,12 @@ namespace GamesToGo.API.Models
         public string Image { get; set; }
 
         public virtual UserType Usertype { get; set; }
+        
+        [JsonIgnore]
         public virtual ICollection<AnswerReport> AnswerReport { get; set; }
+        [JsonIgnore]
         public virtual ICollection<Game> Game { get; set; }
+        [JsonIgnore]
         public virtual ICollection<Report> Report { get; set; }
     }
 }
