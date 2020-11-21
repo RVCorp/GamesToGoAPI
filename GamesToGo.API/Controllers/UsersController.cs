@@ -152,7 +152,7 @@ namespace GamesToGo.API.Controllers
 
         [HttpPost("SendInvitation")]
         [Authorize]
-        public ActionResult SendInvitation(int receiver)
+        public ActionResult SendInvitation([FromForm] int receiver)
         {
             var userReceiver = LoginController.GetOnlineUserForInt(receiver);
             if (userReceiver == null)
@@ -163,7 +163,7 @@ namespace GamesToGo.API.Controllers
             return Ok();
         }
 
-        [HttpPost("Invitations")]
+        [HttpGet("Invitations")]
         [Authorize]
         public ActionResult<List<Invitation>> GetInvitations()
         {

@@ -15,6 +15,7 @@ namespace GamesToGo.API.Models
         }
 
         [NotMapped]
+        [JsonIgnore]
         public Room Room { get; set; }
         public int Id { get; set; }
         public string Username { get; set; }
