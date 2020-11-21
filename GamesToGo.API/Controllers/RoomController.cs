@@ -22,9 +22,9 @@ namespace GamesToGo.API.Controllers
         }
 
         [HttpPost("CreateRoom")]
-        public async Task<ActionResult<Room>> CreateRoom([FromForm] int gameID)
+        public async Task<ActionResult<Room>> CreateRoom([FromForm] string gameID)
         {
-            Game game = await Context.Game.FindAsync(gameID);
+            Game game = await Context.Game.FindAsync(int.Parse(gameID));
             if (game == null)
                 return BadRequest($"Game ID {gameID} not found");
             roomID++;
@@ -41,9 +41,9 @@ namespace GamesToGo.API.Controllers
 
 
         [HttpPost("JoinRoom/{id}")]
-        public ActionResult<Room> JoinRoom([FromForm] int id)
+        public ActionResult<Room> JoinRoom([FromForm] string id)
         {
-            Room jRoom = GetRoom(id);
+            Room jRoom = GetRoom(int.Parse(id));
             
             if (jRoom == null || jRoom.HasStarted || !jRoom.JoinRoom(LoggedUser))
                 return BadRequest();

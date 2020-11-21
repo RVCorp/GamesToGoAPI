@@ -39,8 +39,6 @@ namespace GamesToGo.API.Controllers
             return null;
         }
 
-        public static UserPasswordless GetOnlineUserForInt(int lookup) => GetOnlineUserForString(lookup.ToString());
-
         public LoginController(IConfiguration config, GamesToGoContext context)
         {
             this.config = config;
