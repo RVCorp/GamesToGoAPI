@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using GamesToGo.API.GameExecution;
 using GamesToGo.API.Models;
+using Microsoft.EntityFrameworkCore;
 
 namespace GamesToGo.API.Controllers
 {
@@ -21,9 +22,11 @@ namespace GamesToGo.API.Controllers
         }
 
         [HttpPost("CreateRoom")]
-        public async Task<ActionResult<Room>> CreateRoom(int gameID)
+        public async Task<ActionResult<Room>> CreateRoom([FromForm] int gameID)
         {
             Game game = await Context.Game.FindAsync(gameID);
+            if (game == null)
+                return BadRequest();
             roomID++;
             Room cRoom = new Room(roomID, LoggedUser, game);
             rooms.Add(cRoom);
@@ -38,7 +41,7 @@ namespace GamesToGo.API.Controllers
 
 
         [HttpPost("JoinRoom/{id}")]
-        public ActionResult<Room> JoinRoom(int id)
+        public ActionResult<Room> JoinRoom([FromForm] int id)
         {
             Room jRoom = GetRoom(id);
             
