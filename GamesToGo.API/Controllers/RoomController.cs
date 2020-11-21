@@ -26,7 +26,7 @@ namespace GamesToGo.API.Controllers
         {
             Game game = await Context.Game.FindAsync(gameID);
             if (game == null)
-                return BadRequest();
+                return BadRequest($"Game ID {gameID} not found");
             roomID++;
             Room cRoom = new Room(roomID, LoggedUser, game);
             rooms.Add(cRoom);
