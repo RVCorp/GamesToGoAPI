@@ -40,7 +40,7 @@ namespace GamesToGo.API.Controllers
         }
 
 
-        [HttpPost("JoinRoom/{id}")]
+        [HttpPost("JoinRoom")]
         public ActionResult<Room> JoinRoom([FromForm] string id)
         {
             Room jRoom = GetRoom(int.Parse(id));
