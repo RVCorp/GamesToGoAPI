@@ -24,6 +24,8 @@ namespace GamesToGo.API.Controllers
         [HttpPost("CreateRoom")]
         public async Task<ActionResult<Room>> CreateRoom([FromForm] string gameID)
         {
+            if (LoggedUser.Room != null)
+                return Conflict($"Already joined, leave current room to create another one");
             Game game = await Context.Game.FindAsync(int.Parse(gameID));
             if (game == null)
                 return BadRequest($"Game ID {gameID} not found");
@@ -39,17 +41,35 @@ namespace GamesToGo.API.Controllers
             return rooms.Where(r => r.Game.Id == id).Select(r => (RoomPreview) r).ToList();
         }
 
-
         [HttpPost("JoinRoom")]
         public ActionResult<Room> JoinRoom([FromForm] string id)
         {
+            if (LoggedUser.Room != null)
+                return Conflict();
             Room jRoom = GetRoom(int.Parse(id));
+
+            if (jRoom == null)
+                return NotFound($"No such room");
             
-            if (jRoom == null || jRoom.HasStarted || !jRoom.JoinRoom(LoggedUser))
-                return BadRequest();
+            if (jRoom.HasStarted || !jRoom.JoinUser(LoggedUser))
+                return BadRequest("Room is full or already started");
             
             return jRoom;
         }
+
+        [HttpPost("LeaveRoom")]
+        public ActionResult LeaveRoom()
+        {
+            Room targetRoom = LoggedUser.Room;
+            if (targetRoom?.LeaveUser(LoggedUser) ?? false)
+            {
+                if (((RoomPreview) targetRoom).CurrentPlayers == 0)
+                    rooms.Remove(targetRoom);
+                return Ok();
+            }
+            return Conflict($"Haven't joined no room");
+        }
+        
 
         [HttpGet("RoomState")]
         public ActionResult<Room> JoinedRoomState()
