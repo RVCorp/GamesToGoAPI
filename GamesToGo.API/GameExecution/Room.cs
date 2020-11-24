@@ -127,6 +127,19 @@ namespace GamesToGo.API.GameExecution
 
             return false;
         }
+        
+        public bool ReadyUser(UserPasswordless user)
+        {
+            lock (Lock)
+            {
+                Player targetPlayer = Players.FirstOrDefault(p => p.BackingUser.Id == user.Id);
+                if (targetPlayer == null)
+                    return false;
+                targetPlayer.Ready = true;
+            }
+
+            return true;
+        }
 
         public Player PlayerAtIndex(int index) => Players[index % Players.Length];
 

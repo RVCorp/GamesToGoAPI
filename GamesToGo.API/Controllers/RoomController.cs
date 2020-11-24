@@ -5,7 +5,6 @@ using System.Linq;
 using System.Threading.Tasks;
 using GamesToGo.API.GameExecution;
 using GamesToGo.API.Models;
-using Microsoft.EntityFrameworkCore;
 
 namespace GamesToGo.API.Controllers
 {
@@ -69,7 +68,14 @@ namespace GamesToGo.API.Controllers
             }
             return Conflict($"Haven't joined no room");
         }
-        
+
+        [HttpPost("Ready")]
+        public ActionResult ReadyUser()
+        {
+            if (LoggedUser.Room?.ReadyUser(LoggedUser) ?? false)
+                return Ok();
+            return Conflict("Haven't joined no room");
+        }
 
         [HttpGet("RoomState")]
         public ActionResult<Room> JoinedRoomState()
