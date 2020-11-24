@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using GamesToGo.API.Models;
 using Newtonsoft.Json;
 
@@ -45,7 +46,7 @@ namespace GamesToGo.API.GameExecution
             
             Players = new Player[Game.Maxplayers];
             
-            JoinRoom(user);
+            JoinUser(user);
 
             Owner = Players[0];
 
@@ -57,7 +58,7 @@ namespace GamesToGo.API.GameExecution
             
         }
 
-        public bool JoinRoom(UserPasswordless user)
+        public bool JoinUser(UserPasswordless user)
         {
             lock(Lock)
             {
@@ -82,14 +83,61 @@ namespace GamesToGo.API.GameExecution
 
         public bool MovePlayer(Player player, int desiredPosition)
         {
-            if (Players[desiredPosition] != null)
-                return false;
             lock (Lock)
             {
+                if (Players[desiredPosition] != null)
+                    return false;
                 Players[desiredPosition] = player;
                 Players[player.RoomPosition] = null;
                 player.RoomPosition = desiredPosition;
             }
+            return true;
+        }
+        
+        public bool LeaveUser(UserPasswordless user)
+        {
+            lock(Lock)
+            {
+                for (int i = 0; i < Players.Length; i++)
+                {
+                    if (Players[i] == null)
+                        continue;
+
+                    if (Players[i].BackingUser.Id != user.Id) 
+                        continue;
+                    
+                    Players[i] = null;
+                    user.Room = null;
+                        
+                    if (Owner.BackingUser.Id == user.Id)
+                    {
+                        for (int j = 0; j < Players.Length; j++)
+                        {
+                            if (Players[i] == null)
+                                continue;
+
+                            Players[i].BackingUser.Room = null;
+                            Players[i] = null;
+                        }
+                    }
+                        
+                    return true;
+                }
+            }
+
+            return false;
+        }
+        
+        public bool ReadyUser(UserPasswordless user)
+        {
+            lock (Lock)
+            {
+                Player targetPlayer = Players.FirstOrDefault(p => p.BackingUser.Id == user.Id);
+                if (targetPlayer == null)
+                    return false;
+                targetPlayer.Ready = true;
+            }
+
             return true;
         }
 
