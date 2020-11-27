@@ -1,3 +1,4 @@
+using System;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -47,6 +48,7 @@ namespace GamesToGo.API
                 .AddNewtonsoftJson();
 
             string connection = Configuration.GetConnectionString("ThisAintTheConnectionString");
+            Console.WriteLine($"Using connection: {connection}");
             services.AddDbContext<GamesToGoContext>(options =>
             {
                 options.UseLazyLoadingProxies()
