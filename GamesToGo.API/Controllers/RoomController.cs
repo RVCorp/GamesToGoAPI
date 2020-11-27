@@ -43,15 +43,13 @@ namespace GamesToGo.API.Controllers
         [HttpPost("JoinRoom")]
         public ActionResult<Room> JoinRoom([FromForm] string id)
         {
-            if (LoggedUser.Room != null)
-                return Conflict();
             Room jRoom = GetRoom(int.Parse(id));
 
             if (jRoom == null)
                 return NotFound($"No such room");
             
-            if (jRoom.HasStarted || !jRoom.JoinUser(LoggedUser))
-                return BadRequest("Room is full or already started");
+            if (!JoinRoom(LoggedUser, jRoom))
+                return Conflict("Room is full or already started");
             
             return jRoom;
         }
@@ -59,13 +57,8 @@ namespace GamesToGo.API.Controllers
         [HttpPost("LeaveRoom")]
         public ActionResult LeaveRoom()
         {
-            Room targetRoom = LoggedUser.Room;
-            if (targetRoom?.LeaveUser(LoggedUser) ?? false)
-            {
-                if (((RoomPreview) targetRoom).CurrentPlayers == 0)
-                    rooms.Remove(targetRoom);
+            if (LeaveRoom(LoggedUser))
                 return Ok();
-            }
             return Conflict($"Haven't joined no room");
         }
 
@@ -74,7 +67,7 @@ namespace GamesToGo.API.Controllers
         {
             if (LoggedUser.Room?.ReadyUser(LoggedUser) ?? false)
                 return Ok();
-            return Conflict("Haven't joined no room");
+            return Conflict(LoggedUser.Room?.Owner.BackingUser.Id == LoggedUser.Id ? "Room not ready" : "Haven't joined no room");
         }
 
         [HttpGet("RoomState")]
@@ -89,6 +82,20 @@ namespace GamesToGo.API.Controllers
         public static Room GetRoom(int id)
         {
             return rooms.FirstOrDefault(x => x.ID == id);
+        }
+
+        public static bool LeaveRoom(User user)
+        {
+            if (user?.Room == null || (bool) user.Room?.LeaveUser(user))
+                return false;
+            if (((RoomPreview)user.Room).CurrentPlayers == 0)
+                rooms.Remove(user.Room);
+            return true;
+        }
+
+        public static bool JoinRoom(User user, Room room)
+        {
+            return user.Room != null && !room.HasStarted && room.JoinUser(user);
         }
     }
 }

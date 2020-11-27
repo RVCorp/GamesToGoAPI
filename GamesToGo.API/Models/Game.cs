@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using Newtonsoft.Json;
 
 namespace GamesToGo.API.Models
 {
@@ -18,9 +19,9 @@ namespace GamesToGo.API.Models
         public int Status { get; set; }
         public int Minplayers { get; set; }
         public int Maxplayers { get; set; }
-        public int CreatorId { get; set; }
 
         public virtual User Creator { get; set; }
+        [JsonIgnore]
         public virtual ICollection<Report> Report { get; set; }
     }
 }

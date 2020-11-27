@@ -9,6 +9,16 @@
         "ASPNETCORE_ENVIRONMENT": "Development"
       },
       "applicationUrl": "https://localhost:5001;http://localhost:5000"
+    },
+    "GamesToGoAPI --database": {
+      "commandName": "Project",
+      "commandLineArgs": "--database",
+      "launchBrowser": false,
+      "launchUrl": "api/Users",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      },
+      "applicationUrl": "https://localhost:5001;http://localhost:5000"
     }
   }
 }

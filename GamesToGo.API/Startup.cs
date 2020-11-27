@@ -45,10 +45,12 @@ namespace GamesToGo.API
                 });
             services.AddMvc()
                 .AddNewtonsoftJson();
+
+            string connection = Configuration.GetConnectionString("ThisAintTheConnectionString");
             services.AddDbContext<GamesToGoContext>(options =>
             {
                 options.UseLazyLoadingProxies()
-                    .UseMySql(Configuration.GetConnectionString("ThisAintTheConnectionString"));
+                    .UseMySql(connection, ServerVersion.AutoDetect(connection));
             });
         }
 

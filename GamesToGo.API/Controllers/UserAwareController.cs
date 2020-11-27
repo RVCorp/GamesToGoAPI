@@ -13,6 +13,6 @@ namespace GamesToGo.API.Controllers
             Context = context;
         }
 
-        protected UserPasswordless LoggedUser => LoginController.GetOnlineUserForClaims(((ClaimsIdentity) HttpContext.User.Identity).Claims, Context);
+        protected User LoggedUser => LoginController.GetOnlineUserForClaims(((ClaimsIdentity) HttpContext.User.Identity).Claims, Context);
     }
 }

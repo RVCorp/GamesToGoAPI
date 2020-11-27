@@ -8,13 +8,13 @@ namespace GamesToGo.API.GameExecution
         public int RoomPosition { get; set; }
         
         [JsonProperty(@"User")]
-        public UserPasswordless BackingUser { get; }
+        public User BackingUser { get; }
         
         public bool Ready { get; set; }
 
         public Tile Tile { get; } = new Tile();
 
-        public Player(UserPasswordless user)
+        public Player(User user)
         {
             BackingUser = user;
         }

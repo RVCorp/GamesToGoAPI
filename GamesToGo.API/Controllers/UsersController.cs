@@ -1,10 +1,14 @@
-﻿using Microsoft.AspNetCore.Authorization;
+using System;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Threading.Tasks;
+using GamesToGo.API.GameExecution;
 using GamesToGo.API.Models;
 using GamesToGo.API.Models.File;
 
@@ -12,10 +16,10 @@ namespace GamesToGo.API.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-
     public class UsersController : UserAwareController
     {
-        private static List<Invitation> invitations = new List<Invitation>();
+        private static Dictionary<string, Invitation> invitations = new Dictionary<string, Invitation>();
+        private static int latestInvitationID = 1;
 
         public UsersController(GamesToGoContext context) : base(context)
         {
@@ -24,31 +28,22 @@ namespace GamesToGo.API.Controllers
         // GET: api/Users
         [HttpGet]
         [Authorize]
-        public async Task<ActionResult<IEnumerable<UserPasswordless>>> GetUser()
+        public async Task<ActionResult<IEnumerable<User>>> GetUser()
         {
-            List<UserPasswordless> up = new List<UserPasswordless>();
-            UserPasswordless nup;
-            foreach (var user in await Context.User.ToListAsync())
-            {
-                nup = new UserPasswordless(user);
-                up.Add(nup);
-            }
-            return up;
+            return await Context.User.ToListAsync();
         }
 
         // GET: api/Users/5
         [HttpGet("{id}")]
         [Authorize]
-        public async Task<ActionResult<UserPasswordless>> GetUser(int id)
+        public async Task<ActionResult<User>> GetUser(int id)
         {
             var user = await Context.User.FindAsync(id);
 
             if (user == null)
-            {
                 return NotFound();
-            }
-            UserPasswordless up = new UserPasswordless(user);
-            return up;
+
+            return user;
         }
 
         // PUT: api/Users/5
@@ -88,15 +83,14 @@ namespace GamesToGo.API.Controllers
         // To protect from overposting attacks, enable the specific properties you want to bind to, for
         // more details, see https://go.microsoft.com/fwlink/?linkid=2123754.
         [HttpPost]
-        public async Task<ActionResult<UserPasswordless>> PostUser(User user)
+        public async Task<ActionResult<User>> PostUser(UserLogin user)
         {
-            if (UserExists(user.Username, user.Email)) 
+            if (UserExists(user.User.Username) || UserExists(user.Email))
                 return BadRequest("");
-            user.UsertypeId = 1;
-            await Context.User.AddAsync(user);
+            await Context.UserLogin.AddAsync(user);
             await Context.SaveChangesAsync();
-            UserPasswordless up = new UserPasswordless(user);
-            return CreatedAtAction("GetUser", up);
+            var returnUser = await Context.User.FindAsync(user.User);
+            return CreatedAtAction("GetUser", returnUser);
         }
 
         [HttpPost("UploadImage")]
@@ -110,9 +104,10 @@ namespace GamesToGo.API.Controllers
             {
                 await ifile.CopyToAsync(filestream);
             }
+
             LoggedUser.Image = LoggedUser.Username + Path.GetExtension(ifile.FileName);
             await Context.SaveChangesAsync();
-            return Ok(new { status = true, message = "Image Posted Successfully" });
+            return Ok(new {status = true, message = "Image Posted Successfully"});
         }
 
         [HttpGet("DownloadImage/{id}")]
@@ -134,7 +129,7 @@ namespace GamesToGo.API.Controllers
         // DELETE: api/Users/5
         [HttpDelete("{id}")]
         [Authorize]
-        public async Task<ActionResult<UserPasswordless>> DeleteUser(int id)
+        public async Task<ActionResult<User>> DeleteUser(int id)
         {
             var user = await Context.User.FindAsync(id);
             if (user == null)
@@ -145,9 +140,7 @@ namespace GamesToGo.API.Controllers
             Context.User.Remove(user);
             await Context.SaveChangesAsync();
 
-            UserPasswordless up = new UserPasswordless(user);
-
-            return up;
+            return user;
         }
 
         [HttpPost("SendInvitation")]
@@ -157,9 +150,17 @@ namespace GamesToGo.API.Controllers
             var userReceiver = LoginController.GetOnlineUserForString(receiver);
             if (userReceiver == null)
                 return BadRequest();
-                
-            var invitation = new Invitation(LoggedUser, userReceiver, LoggedUser.Room);
-            invitations.Add(invitation);
+            if (LoggedUser.Room == null)
+                return Conflict();
+
+            var invitation = new Invitation
+            {
+                ID = latestInvitationID++,
+                Sender = LoggedUser,
+                Receiver = userReceiver,
+                Room = LoggedUser.Room,
+            };
+            invitations.Add(invitation.ID.ToString(), invitation);
             return Ok();
         }
 
@@ -167,7 +168,94 @@ namespace GamesToGo.API.Controllers
         [Authorize]
         public ActionResult<List<Invitation>> GetInvitations()
         {
-            return invitations.Where(x => x.Receiver == LoggedUser).ToList();
+            return invitations.Values.Where(x => x.Receiver == LoggedUser).ToList();
+        }
+
+        [HttpPost("AcceptInvitation")]
+        [Authorize]
+        public ActionResult<Room> AcceptInvitation([FromForm] string invitationID)
+        {
+            if (!invitations.ContainsKey(invitationID) || invitations[invitationID].Receiver.Id != LoggedUser.Id)
+                return BadRequest();
+
+            var accepted = invitations[invitationID];
+
+            if (LoggedUser.Room != accepted.Room)
+            {
+                invitations.Remove(invitationID);
+                return LoggedUser.Room;
+            }
+
+            if (LoggedUser.Room != null)
+                RoomController.LeaveRoom(LoggedUser);
+
+            if (!RoomController.JoinRoom(LoggedUser, accepted.Room))
+                return Conflict();
+
+            invitations.Remove(invitationID);
+            return LoggedUser.Room;
+        }
+
+        [HttpPost("IgnoreInvitation")]
+        [Authorize]
+        public IActionResult IgnoreInvitation([FromForm] string invitationID)
+        {
+            if (!invitations.ContainsKey(invitationID) || invitations[invitationID].Receiver.Id != LoggedUser.Id)
+                return BadRequest();
+
+            invitations.Remove(invitationID);
+            return Ok();
+        }
+
+        [HttpGet("Statistics")]
+        [Authorize]
+        public async Task<ActionResult<List<NamedStatistic>>> GetUserStatistics()
+        {
+            ConstructStatistics(LoggedUser, Context);
+            return await Context.UserStatistic
+                .Where(s => s.User.Id == LoggedUser.Id)
+                .Select(s => new NamedStatistic
+                {
+                    Amount = s.Amount,
+                    Name = GetEnumDescription(s.Type),
+                }).ToListAsync();
+        }
+
+        private static void ConstructStatistics(User user, GamesToGoContext context)
+        {
+            var existing = context.UserStatistic.Where(s => s.User.Id == user.Id).ToList();
+            var expected = Enum.GetValues<UserStatisticType>();
+            var existingTypes = existing.Select(s => s.Type).ToList();
+            var expectedTypes = expected.ToList();
+
+            for (int i = 0; i < existingTypes.Count; i++)
+            {
+                if (expectedTypes.All(t => t != existingTypes[i])) 
+                    continue;
+                
+                expectedTypes.Remove(existingTypes[i]);
+                existingTypes.Remove(existingTypes[i]);
+                i--;
+            }
+
+            if (!existingTypes.Any() || !expectedTypes.Any())
+            {
+                foreach (var newStat in expectedTypes)
+                {
+                    context.UserStatistic.Add(new UserStatistic
+                    {
+                        Type = newStat,
+                        User = context.User.Find(user.Id),
+                    });
+                }
+
+                foreach (var oldStat in existingTypes)
+                {
+                    context.UserStatistic.Remove(existing.First(s => s.Type == oldStat));
+                }
+            }
+
+            context.SaveChanges();
         }
 
         private bool UserExists(int id)
@@ -175,10 +263,15 @@ namespace GamesToGo.API.Controllers
             return Context.User.Any(e => e.Id == id);
         }
 
-        private bool UserExists(string username, string email)
+        private bool UserExists(string userEmail)
         {
-            return Context.User.Any(e => e.Username == username || e.Email == email);
+            return Context.UserLogin.Any(e => e.User.Username == userEmail || e.Email == userEmail);
         }
 
+        private static string GetEnumDescription(object enumValue)
+        {
+            return enumValue.GetType().GetField(enumValue.ToString()!)?
+                .GetCustomAttribute<DescriptionAttribute>()?.Description ?? enumValue.ToString();
+        }
     }
 }

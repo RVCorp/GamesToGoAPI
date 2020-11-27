@@ -3,14 +3,16 @@ using System;
 using GamesToGo.API.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 namespace GamesToGo.API.Migrations
 {
     [DbContext(typeof(GamesToGoContext))]
-    partial class GamesToGoContextModelSnapshot : ModelSnapshot
+    [Migration("20201125065454_DatabaseRework")]
+    partial class DatabaseRework
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -145,28 +147,6 @@ namespace GamesToGo.API.Migrations
                     b.ToTable("UserLogin");
                 });
 
-            modelBuilder.Entity("GamesToGo.API.Models.UserStatistic", b =>
-                {
-                    b.Property<int>("ID")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    b.Property<int>("Amount")
-                        .HasColumnType("int");
-
-                    b.Property<int>("Type")
-                        .HasColumnType("int");
-
-                    b.Property<int?>("UserId")
-                        .HasColumnType("int");
-
-                    b.HasKey("ID");
-
-                    b.HasIndex("UserId");
-
-                    b.ToTable("UserStatistic");
-                });
-
             modelBuilder.Entity("GamesToGo.API.Models.Game", b =>
                 {
                     b.HasOne("GamesToGo.API.Models.User", "Creator")
@@ -206,15 +186,6 @@ namespace GamesToGo.API.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("GamesToGo.API.Models.UserStatistic", b =>
-                {
-                    b.HasOne("GamesToGo.API.Models.User", "User")
-                        .WithMany("UserStatistic")
-                        .HasForeignKey("UserId");
-
-                    b.Navigation("User");
-                });
-
             modelBuilder.Entity("GamesToGo.API.Models.Game", b =>
                 {
                     b.Navigation("Report");
@@ -225,8 +196,6 @@ namespace GamesToGo.API.Migrations
                     b.Navigation("Game");
 
                     b.Navigation("Report");
-
-                    b.Navigation("UserStatistic");
                 });
 #pragma warning restore 612, 618
         }

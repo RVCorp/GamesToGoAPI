@@ -39,7 +39,7 @@ namespace GamesToGo.API.GameExecution
 
         public double TimeElapsed => timeStarted == null ? 0 : (DateTime.Now - timeStarted).Value.TotalMilliseconds;
         
-        public Room(int id, UserPasswordless user, Game game)
+        public Room(int id, User user, Game game)
         {
             ID = id;
             Game = game;
@@ -58,7 +58,7 @@ namespace GamesToGo.API.GameExecution
             
         }
 
-        public bool JoinUser(UserPasswordless user)
+        public bool JoinUser(User user)
         {
             lock(Lock)
             {
@@ -94,7 +94,7 @@ namespace GamesToGo.API.GameExecution
             return true;
         }
         
-        public bool LeaveUser(UserPasswordless user)
+        public bool LeaveUser(User user)
         {
             lock(Lock)
             {
@@ -128,13 +128,22 @@ namespace GamesToGo.API.GameExecution
             return false;
         }
         
-        public bool ReadyUser(UserPasswordless user)
+        public bool ReadyUser(User user)
         {
             lock (Lock)
             {
+                if (HasStarted)
+                    return false;
                 Player targetPlayer = Players.FirstOrDefault(p => p.BackingUser.Id == user.Id);
                 if (targetPlayer == null)
                     return false;
+                if (targetPlayer == Owner)
+                {
+                    if (Players.Except(new[] {Owner}).All(p => p.Ready))
+                        HasStarted = true;
+                    else
+                        return false;
+                }
                 targetPlayer.Ready = true;
             }
 
@@ -163,7 +172,7 @@ namespace GamesToGo.API.GameExecution
     {
         public int ID { get; }
         
-        public UserPasswordless Owner { get; }
+        public User Owner { get; }
         
         public int CurrentPlayers { get; }
         

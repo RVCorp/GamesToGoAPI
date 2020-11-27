@@ -8,6 +8,7 @@ using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Threading.Tasks;
+using GamesToGo.API.Extensions;
 using GamesToGo.API.Models;
 using GamesToGo.API.Models.File;
 
@@ -80,7 +81,7 @@ namespace GamesToGo.API.Controllers
             {
                 return NotFound();
             }
-            if (LoggedUser.Id != game.CreatorId)
+            if (LoggedUser.Id != game.Creator.Id)
             {
                 return BadRequest();
             }
@@ -123,8 +124,7 @@ namespace GamesToGo.API.Controllers
 
             foreach (var inFile in Directory.GetFiles(filePath.Replace(".zip", "")))
             {
-                string fileHash = string.Empty;
-                await Task.Run(() => fileHash = HashBytes(System.IO.File.ReadAllBytes(inFile)));
+                string fileHash = (await System.IO.File.ReadAllBytesAsync(inFile)).SHA1();
                 if (fileHash == Path.GetFileName(inFile))
                 {
                     await Task.Run(() =>
@@ -149,7 +149,7 @@ namespace GamesToGo.API.Controllers
             Directory.Delete(filePath.Replace(".zip", ""));
             if (int.Parse(gameID) == -1 || (game = await Context.Game.FindAsync(int.Parse(gameID))) == null)
             {
-                game = new Game { Creator = LoggedUser.User };
+                game = new Game { Creator = LoggedUser };
                 await Context.Game.AddAsync(game);
             }
             
@@ -226,7 +226,7 @@ namespace GamesToGo.API.Controllers
         public async Task<ActionResult<List<Game>>> GetGames()
         {
             List<Game> i;
-            i = await Context.Game.Where(x => x.CreatorId == LoggedUser.Id).ToListAsync();
+            i = await Context.Game.Where(x => x.Creator.Id == LoggedUser.Id).ToListAsync();
             return i;
         }
 
@@ -235,7 +235,7 @@ namespace GamesToGo.API.Controllers
         public async Task<ActionResult<List<Game>>> GetPublishedGames()
         {
             List<Game> g;
-            g = await Context.Game.Where(x => x.CreatorId == LoggedUser.Id && x.Status == 3).ToListAsync();
+            g = await Context.Game.Where(x => x.Creator.Id == LoggedUser.Id && x.Status == 3).ToListAsync();
             return g;
         }
 
@@ -251,12 +251,6 @@ namespace GamesToGo.API.Controllers
         private bool GameExists(int id)
         {
             return Context.Game.Any(e => e.Id == id);
-        }
-
-        public static string HashBytes(byte[] bytes) //Obtiene SHA1 de una secuencia de bytes
-        {
-            using SHA1Managed hasher = new SHA1Managed();
-            return string.Concat(hasher.ComputeHash(bytes).Select(by => by.ToString("X2")));
         }
     }
 }

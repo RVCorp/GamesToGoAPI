@@ -1,21 +1,17 @@
-﻿using System.Collections.Generic;
+using System;
+using System.Collections.Generic;
+using System.Text.Json.Serialization;
 
 namespace GamesToGo.API.Models
 {
-    public partial class Report
+    public class Report
     {
-        public Report()
-        {
-            AnswerReport = new HashSet<AnswerReport>();
-        }
-
         public int Id { get; set; }
         public string Reason { get; set; }
-        public int UserId { get; set; }
-        public int GameId { get; set; }
-
+        
+        public DateTime TimeReported { get; set; }
         public virtual Game Game { get; set; }
+        public virtual ReportType ReportType { get; set; }
         public virtual User User { get; set; }
-        public virtual ICollection<AnswerReport> AnswerReport { get; set; }
     }
 }
