@@ -45,7 +45,7 @@ namespace GamesToGo.API.Controllers
             {
                 addOnlineUser(logoutTimeUpdate.User.Find(int.Parse(lookup)));
                 onlineUsers[lookup].LogoutTime = DateTime.Now.AddMinutes(1);
-                logoutTimeUpdate.SaveChangesAsync();
+                logoutTimeUpdate.SaveChanges();
                 return onlineUsers[lookup];
             }
 
