@@ -48,7 +48,6 @@ namespace GamesToGo.API
                 .AddNewtonsoftJson();
 
             string connection = Configuration.GetConnectionString("ThisAintTheConnectionString");
-            Console.WriteLine($"Using connection: {connection}");
             services.AddDbContext<GamesToGoContext>(options =>
             {
                 options.UseLazyLoadingProxies()
