@@ -21,6 +21,17 @@ namespace GamesToGo.API.GameExecution
 
         public Player[] Players { get; }
 
+        public int JoinedPlayers
+        {
+            get
+            {
+                lock (Lock)
+                {
+                    return Players.Count(p => p != null && p.Ready);
+                }
+            }
+        }
+
         public List<Board> Boards { get; } = new List<Board>(); 
         
         [JsonIgnore]
@@ -62,6 +73,8 @@ namespace GamesToGo.API.GameExecution
         {
             lock(Lock)
             {
+                if (HasStarted)
+                    return false;
                 for (int i = 0; i < Players.Length; i++)
                 {
                     if (Players[i] != null)
@@ -139,7 +152,7 @@ namespace GamesToGo.API.GameExecution
                     return false;
                 if (targetPlayer == Owner)
                 {
-                    if (Players.Except(new[] {Owner}).All(p => p.Ready))
+                    if (JoinedPlayers >= Game.Minplayers && Players.Except(new[] {Owner}).All(p => p.Ready))
                         HasStarted = true;
                     else
                         return false;

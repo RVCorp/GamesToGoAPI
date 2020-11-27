@@ -21,11 +21,11 @@ namespace GamesToGo.API.Controllers
         }
 
         [HttpPost("CreateRoom")]
-        public async Task<ActionResult<Room>> CreateRoom([FromForm] string gameID)
+        public ActionResult<Room> CreateRoom([FromForm] string gameID)
         {
             if (LoggedUser.Room != null)
                 return Conflict($"Already joined, leave current room to create another one");
-            Game game = await Context.Game.FindAsync(int.Parse(gameID));
+            Game game = Context.Game.Find(int.Parse(gameID));
             if (game == null)
                 return BadRequest($"Game ID {gameID} not found");
             roomID++;
@@ -86,16 +86,21 @@ namespace GamesToGo.API.Controllers
 
         public static bool LeaveRoom(User user)
         {
-            if (user?.Room == null || !(bool) user.Room?.LeaveUser(user))
+            var toLeaveRoom = user?.Room;
+            if (toLeaveRoom == null || !(bool) toLeaveRoom?.LeaveUser(user))
                 return false;
-            if (((RoomPreview)user.Room).CurrentPlayers == 0)
-                rooms.Remove(user.Room);
+            if (((RoomPreview) toLeaveRoom).CurrentPlayers == 0)
+            {
+                UsersController.ClearInvitationsFor(toLeaveRoom);
+                rooms.Remove(toLeaveRoom);
+            }
+
             return true;
         }
 
         public static bool JoinRoom(User user, Room room)
         {
-            return user.Room != null && !room.HasStarted && room.JoinUser(user);
+            return user.Room == null && !room.HasStarted && room.JoinUser(user);
         }
     }
 }

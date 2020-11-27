@@ -273,5 +273,14 @@ namespace GamesToGo.API.Controllers
             return enumValue.GetType().GetField(enumValue.ToString()!)?
                 .GetCustomAttribute<DescriptionAttribute>()?.Description ?? enumValue.ToString();
         }
+
+        public static void ClearInvitationsFor(Room toLeaveRoom)
+        {
+            var toRemove = invitations.Where(i => i.Value.Room == toLeaveRoom).Select(i => i.Key);
+            foreach (var removable in toRemove)
+            {
+                invitations.Remove(removable);
+            }
+        }
     }
 }
