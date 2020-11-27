@@ -15,6 +15,7 @@ namespace GamesToGo.API
         {
             Console.WriteLine(Environment.CurrentDirectory);
             Console.WriteLine(System.Reflection.Assembly.GetExecutingAssembly().Location);
+            Console.WriteLine(string.Join(' ', args));
             Environment.CurrentDirectory = Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location);
             var host = CreateHostBuilder(args).Build();
 
