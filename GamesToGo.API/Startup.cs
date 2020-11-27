@@ -9,6 +9,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using GamesToGo.API.Controllers;
 using GamesToGo.API.Models;
 
 namespace GamesToGo.API
@@ -46,6 +47,8 @@ namespace GamesToGo.API
                 });
             services.AddMvc()
                 .AddNewtonsoftJson();
+
+            LoginController.CheckOfflineThread.Start();
 
             string connection = Configuration.GetConnectionString("ThisAintTheConnectionString");
             services.AddDbContext<GamesToGoContext>(options =>

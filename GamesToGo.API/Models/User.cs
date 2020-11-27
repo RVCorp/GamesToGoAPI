@@ -20,7 +20,7 @@ namespace GamesToGo.API.Models
         public int Id { get; set; }
         public string Username { get; set; }
         public string Image { get; set; }
-        
+        [NotMapped]
         public DateTime LogoutTime { get; set; }
         [JsonIgnore]
         public virtual ICollection<Game> Game { get; set; }

@@ -8,6 +8,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Linq;
 using System.Security.Claims;
 using System.Text;
+using System.Threading;
 using GamesToGo.API.Extensions;
 using GamesToGo.API.Models;
 //using Microsoft.Net.Http.Headers;
@@ -16,70 +17,101 @@ namespace GamesToGo.API.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    public class LoginController : ControllerBase
+    public class LoginController : UserAwareController
     {
         private readonly IConfiguration config;
-        private readonly GamesToGoContext context;
-        private static readonly Dictionary<string, User> onlineUsers = new Dictionary<string, User>();
-
-        private static User getOnlineUser(string lookup, GamesToGoContext logoutTimeUpdate = null)
+        private static readonly object onlineUsersLock = new object();
+        private static readonly Dictionary<int, User> onlineUsers = new Dictionary<int, User>();
+        public static readonly Thread CheckOfflineThread = new Thread(CheckForOfflineUsers)
         {
-            if (onlineUsers.TryGetValue(lookup, out var onlineUser))
+            Name = "Offline User Purging",
+            IsBackground = true,
+        };
+
+        private static void CheckForOfflineUsers()
+        {
+            lock (onlineUsersLock)
             {
-                if (logoutTimeUpdate != null)
+                foreach (var offlineUser in onlineUsers.Where(u => u.Value.LogoutTime <= DateTime.Now))
                 {
-                    onlineUser.LogoutTime = DateTime.Now.AddMinutes(1);
-                    logoutTimeUpdate.SaveChangesAsync();
+                    UsersController.ClearInvitationsFor(offlineUser.Value);
+                    if (offlineUser.Value.Room != null)
+                        RoomController.LeaveRoom(offlineUser.Value);
+                    onlineUsers.Remove(offlineUser.Key);
                 }
-
-                if (onlineUser.LogoutTime > DateTime.Now) 
-                    return onlineUser;
-
-                if (onlineUser.Room != null)
-                    RoomController.LeaveRoom(onlineUser);
-                onlineUsers.Remove(lookup);
-                return null;
             }
 
-            if (logoutTimeUpdate != null)
-            {
-                addOnlineUser(logoutTimeUpdate.User.Find(int.Parse(lookup)));
-                onlineUsers[lookup].LogoutTime = DateTime.Now.AddMinutes(1);
-                logoutTimeUpdate.SaveChanges();
-                return onlineUsers[lookup];
-            }
-
-            return null;
+            Thread.Sleep(1000);
         }
 
-        public static User GetOnlineUserForClaims(IEnumerable<Claim> claims, GamesToGoContext context) =>
-            getOnlineUser(claims.ElementAt(3).Value, context);
+        private static User getOnlineUser(int lookup)
+        {
+            lock (onlineUsersLock)
+            {
+                if (!onlineUsers.TryGetValue(lookup, out var onlineUser))
+                    return null;
+                if (onlineUser.LogoutTime <= DateTime.Now)
+                {
+                    if (onlineUser.Room != null)
+                        RoomController.LeaveRoom(onlineUser);
+                    onlineUsers.Remove(lookup);
+                    return null;
+                }
 
-        public static User GetOnlineUserForString(string lookup) => getOnlineUser(lookup);
+                return onlineUser;
+            }
+        }
 
-        public LoginController(IConfiguration config, GamesToGoContext context)
+        public static User GetOnlineUserForClaims(IEnumerable<Claim> claims, GamesToGoContext context)
+        {
+            int userID = int.Parse(claims.ElementAt(3).Value);
+            addOnlineUser(context.User.Find(userID));
+            return getOnlineUser(userID);
+        }
+
+        public static User GetOnlineUserForID(int lookup) => getOnlineUser(lookup);
+
+        public LoginController(IConfiguration config, GamesToGoContext context) : base(context)
         {
             this.config = config;
-            this.context = context;
         }
 
         [HttpGet("OnlineUsers")]
         [Authorize]
         public ActionResult<IEnumerable<User>> GetOnlineUsers()
         {
-            if (onlineUsers == null) 
-                return BadRequest();
-            
-            foreach (var offlineUser in onlineUsers.Where(u => u.Value.LogoutTime <= DateTime.Now).Select(ou => ou.Key))
-                onlineUsers.Remove(offlineUser);
-            return onlineUsers.Values;
+            lock (onlineUsersLock)
+            {
+                if (onlineUsers == null)
+                    return BadRequest();
+            }
+
+            lock (onlineUsersLock)
+            {
+                foreach (var offlineUser in onlineUsers.Where(u => u.Value.LogoutTime <= DateTime.Now)
+                    .Select(ou => ou.Key))
+                    onlineUsers.Remove(offlineUser);
+            }
+
+            lock (onlineUsersLock)
+                return onlineUsers.Values.Except(new[] {LoggedUser}).ToList();
         }
 
         private static void addOnlineUser(User user)
         {
-            if (onlineUsers.ContainsKey(user.Id.ToString())) 
-                return;
-            onlineUsers.Add(user.Id.ToString(), user);
+            lock (onlineUsersLock)
+            {
+                if (onlineUsers.TryGetValue(user.Id, out var existingUser))
+                {
+                    existingUser.LogoutTime = DateTime.Now.AddMinutes(1);
+                    return;
+                }
+            }
+            
+            user.LogoutTime = DateTime.Now.AddMinutes(1);
+            
+            lock (onlineUsersLock)
+                onlineUsers.Add(user.Id, user);
         }
 
         [HttpGet]
@@ -87,7 +119,7 @@ namespace GamesToGo.API.Controllers
         {
             //bool mobileLogin = Request.Headers[HeaderNames.UserAgent].Any(ua => ua == "gtg-app");
 
-            var user = context.UserLogin.Where(x => x.User.Username == username || x.Email == username).FirstOrDefault(x => x.Password == pass);
+            var user = Context.UserLogin.Where(x => x.User.Username == username || x.Email == username).FirstOrDefault(x => x.Password == pass);
 
             if (user == null)
                 return Unauthorized();

@@ -147,7 +147,9 @@ namespace GamesToGo.API.Controllers
         [Authorize]
         public ActionResult SendInvitation([FromForm] string receiver)
         {
-            var userReceiver = LoginController.GetOnlineUserForString(receiver);
+            if (!int.TryParse(receiver, out int receiverID))
+                return BadRequest("NaN");
+            var userReceiver = LoginController.GetOnlineUserForID(receiverID);
             if (userReceiver == null)
                 return BadRequest();
             if (LoggedUser.Room == null)
@@ -272,6 +274,15 @@ namespace GamesToGo.API.Controllers
         {
             return enumValue.GetType().GetField(enumValue.ToString()!)?
                 .GetCustomAttribute<DescriptionAttribute>()?.Description ?? enumValue.ToString();
+        }
+
+        public static void ClearInvitationsFor(User user)
+        {
+            var toRemove = invitations.Where(i => i.Value.Receiver.Id == user.Id || i.Value.Sender.Id == user.Id).Select(i => i.Key);
+            foreach (var removable in toRemove)
+            {
+                invitations.Remove(removable);
+            }
         }
 
         public static void ClearInvitationsFor(Room toLeaveRoom)
