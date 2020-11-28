@@ -152,7 +152,7 @@ namespace GamesToGo.API.GameExecution
                     return false;
                 if (targetPlayer == Owner)
                 {
-                    if (JoinedPlayers >= Game.Minplayers && Players.Except(new[] { Owner }).All(p => p.Ready))
+                    if (JoinedPlayers >= Game.Minplayers && Players.Except(new[] { Owner }).Where(p => p != null).All(p => p.Ready))
                         HasStarted = true;
                     else
                         return false;
