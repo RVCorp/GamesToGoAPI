@@ -182,12 +182,6 @@ namespace GamesToGo.API.Controllers
 
             var accepted = invitations[invitationID];
 
-            if (LoggedUser.Room != accepted.Room)
-            {
-                invitations.Remove(invitationID);
-                return LoggedUser.Room;
-            }
-
             if (LoggedUser.Room != null)
                 RoomController.LeaveRoom(LoggedUser);
 
@@ -240,7 +234,7 @@ namespace GamesToGo.API.Controllers
                 i--;
             }
 
-            if (!existingTypes.Any() || !expectedTypes.Any())
+            if (existingTypes.Any() || expectedTypes.Any())
             {
                 foreach (var newStat in expectedTypes)
                 {
