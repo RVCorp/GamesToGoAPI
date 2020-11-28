@@ -123,7 +123,6 @@ namespace GamesToGo.API.Controllers
             lock (onlineUsersLock)
             {
                 LoggedUser.ManualLogout = true;
-                LoggedUser.LogoutTime = DateTime.Now;
             }
 
             return Ok();

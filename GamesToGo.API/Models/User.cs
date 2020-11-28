@@ -20,8 +20,17 @@ namespace GamesToGo.API.Models
         public int Id { get; set; }
         public string Username { get; set; }
         public string Image { get; set; }
+
         [NotMapped]
-        public DateTime LogoutTime { get; set; }
+        public DateTime LogoutTime
+        {
+            get => ManualLogout ? DateTime.Now.AddMinutes(-1) : logoutTime;
+            set => logoutTime = ManualLogout ? DateTime.Now.AddMinutes(-1) : value;
+        }
+
+        [NotMapped]
+        [JsonIgnore]
+        private DateTime logoutTime;
         [NotMapped]
         public bool ManualLogout { get; set; }
         [JsonIgnore]
