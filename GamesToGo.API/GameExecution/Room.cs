@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using GamesToGo.API.Models;
@@ -27,7 +27,7 @@ namespace GamesToGo.API.GameExecution
             {
                 lock (Lock)
                 {
-                    return Players.Count(p => p != null && p.Ready);
+                    return Players.Count(p => p != null);
                 }
             }
         }
@@ -152,7 +152,7 @@ namespace GamesToGo.API.GameExecution
                     return false;
                 if (targetPlayer == Owner)
                 {
-                    if (JoinedPlayers >= Game.Minplayers && Players.Except(new[] {Owner}).All(p => p.Ready))
+                    if (JoinedPlayers >= Game.Minplayers && Players.Except(new[] { Owner }).All(p => p.Ready))
                         HasStarted = true;
                     else
                         return false;
