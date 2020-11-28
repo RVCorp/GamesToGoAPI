@@ -22,6 +22,8 @@ namespace GamesToGo.API.Models
         public string Image { get; set; }
         [NotMapped]
         public DateTime LogoutTime { get; set; }
+        [NotMapped]
+        public bool ManualLogout { get; set; }
         [JsonIgnore]
         public virtual ICollection<Game> Game { get; set; }
         [JsonIgnore]

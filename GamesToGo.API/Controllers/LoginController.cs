@@ -103,6 +103,8 @@ namespace GamesToGo.API.Controllers
             {
                 if (onlineUsers.TryGetValue(user.Id, out var existingUser))
                 {
+                    if (existingUser.ManualLogout)
+                        return;
                     existingUser.LogoutTime = DateTime.Now.AddMinutes(1);
                     return;
                 }
@@ -112,6 +114,19 @@ namespace GamesToGo.API.Controllers
             
             lock (onlineUsersLock)
                 onlineUsers.Add(user.Id, user);
+        }
+
+        [HttpGet("Logout")]
+        [Authorize]
+        public IActionResult Logout()
+        {
+            lock (onlineUsersLock)
+            {
+                LoggedUser.ManualLogout = true;
+                LoggedUser.LogoutTime = DateTime.Now;
+            }
+
+            return Ok();
         }
 
         [HttpGet]
