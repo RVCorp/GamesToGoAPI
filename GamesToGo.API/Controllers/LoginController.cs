@@ -31,17 +31,10 @@ namespace GamesToGo.API.Controllers
         private static void CheckForOfflineUsers()
         {
             lock (onlineUsersLock)
-            {
-                foreach (var offlineUser in onlineUsers.Where(u => u.Value.LogoutTime <= DateTime.Now))
-                {
-                    UsersController.ClearInvitationsFor(offlineUser.Value);
-                    if (offlineUser.Value.Room != null)
-                        RoomController.LeaveRoom(offlineUser.Value);
-                    onlineUsers.Remove(offlineUser.Key);
-                }
-            }
+                foreach (var offlineUser in onlineUsers.Where(u => u.Value.ManualLogout || u.Value.LogoutTime <= DateTime.Now))
+                    removeOnlineUser(offlineUser.Value);
 
-            Thread.Sleep(1000);
+            Thread.Sleep(500);
         }
 
         private static User getOnlineUser(int lookup)
@@ -97,12 +90,17 @@ namespace GamesToGo.API.Controllers
                 return onlineUsers.Values.Except(new[] {LoggedUser}).ToList();
         }
 
-        private static void addOnlineUser(User user)
+        private static void addOnlineUser(User user, bool force = false)
         {
             lock (onlineUsersLock)
             {
                 if (onlineUsers.TryGetValue(user.Id, out var existingUser))
                 {
+                    if (force)
+                    {
+                        removeOnlineUser(existingUser);
+                        addOnlineUser(user);
+                    }
                     if (existingUser.ManualLogout)
                         return;
                     existingUser.LogoutTime = DateTime.Now.AddMinutes(1);
@@ -114,6 +112,17 @@ namespace GamesToGo.API.Controllers
             
             lock (onlineUsersLock)
                 onlineUsers.Add(user.Id, user);
+        }
+
+        private static void removeOnlineUser(User user)
+        {
+            lock (onlineUsersLock)
+            {
+                UsersController.ClearInvitationsFor(user);
+                if (user.Room != null)
+                    RoomController.LeaveRoom(user);
+                onlineUsers.Remove(user.Id);
+            }
         }
 
         [HttpGet("Logout")]
@@ -139,7 +148,7 @@ namespace GamesToGo.API.Controllers
                 return Unauthorized();
             
             var tokenStr = GenerateJWT(user);
-            addOnlineUser(user.User);
+            addOnlineUser(user.User, true);
             return Ok(new {token = tokenStr, id = user.User.Id});
         }
 
