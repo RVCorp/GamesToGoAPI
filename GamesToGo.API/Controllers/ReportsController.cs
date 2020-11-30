@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Authentication.JwtBearer;
+﻿using System;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -74,13 +75,29 @@ namespace GamesToGo.API.Controllers
         // POST: api/Reports
         // To protect from overposting attacks, enable the specific properties you want to bind to, for
         // more details, see https://go.microsoft.com/fwlink/?linkid=2123754.
-        [HttpPost]
-        public async Task<ActionResult<Report>> PostReport(Report report)
+        [HttpPost("ReportGame")]
+        public async Task<IActionResult> ReportGame([FromForm] string reason, [FromForm] string gameID, [FromForm] string type)
         {
-            Context.Report.Add(report);
+            if (!int.TryParse(type, out int typeID))
+                return BadRequest();
+            if (!int.TryParse(gameID, out int gameIDUseful))
+                return BadRequest(); 
+            var typeObject = await Context.ReportType.FindAsync(typeID);
+            if (typeObject == null)
+                return BadRequest("No such report type");
+            var gameObject = await Context.Game.FindAsync(gameIDUseful);
+            if (gameObject == null)
+                return NotFound("No such gameID");
+            await Context.Report.AddAsync(new Report
+            {
+                ReportType = typeObject,
+                Reason = string.IsNullOrEmpty(reason) ? String.Empty : reason,
+                Game = gameObject,
+                User = await Context.User.FindAsync(LoggedUser.Id),
+            });
             await Context.SaveChangesAsync();
 
-            return CreatedAtAction("GetReport", new { id = report.Id }, report);
+            return Ok();
         }
 
         // DELETE: api/Reports/5
@@ -102,6 +119,12 @@ namespace GamesToGo.API.Controllers
         private bool ReportExists(int id)
         {
             return Context.Report.Any(e => e.Id == id);
+        }
+
+        [HttpGet("Available")]
+        public async Task<ActionResult<List<ReportType>>> GetAvailableTypes()
+        {
+            return await Context.ReportType.ToListAsync();
         }
     }
 }
