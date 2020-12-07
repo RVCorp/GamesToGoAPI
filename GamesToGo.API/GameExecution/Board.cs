@@ -4,8 +4,13 @@ namespace GamesToGo.API.GameExecution
 {
     public class Board
     {
+        public Board(int typeID)
+        {
+            TypeID = typeID;
+        }
+
         public int TypeID { get; }
-        public int ID { get; }
-        public List<Tile> Tiles;
+        public List<Tile> Tiles { get; set; }
+        public bool[] Visibility { get; set; }
     }
 }

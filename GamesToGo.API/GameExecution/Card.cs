@@ -4,13 +4,21 @@ namespace GamesToGo.API.GameExecution
 {
     public class Card
     {
+        public Card(int typeID, int id = 0)
+        {
+            TypeID = typeID;
+            ID = id;
+        }
+
         public int ID { get; }
 
         public int TypeID { get; }
         
-        public int Orientation { get; set; }
+        public Orientation Orientation { get; set; }
         
-        public bool FrontVisible { get; set; }
+        public Privacy Privacy { get; set; }
+
+        public SideVisible SideVisible { get; set; }
 
         public List<Token> Tokens { get; } = new List<Token>();
 
@@ -22,6 +30,17 @@ namespace GamesToGo.API.GameExecution
         public void MoveTo()
         {
             
+        }
+
+        public Card CloneEmpty(int id)
+        {
+            var card = new Card(TypeID, id)
+            {
+                Orientation = Orientation, 
+                Privacy = Privacy, 
+                SideVisible = SideVisible,
+            };
+            return card;
         }
     }
 }

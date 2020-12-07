@@ -12,7 +12,7 @@ namespace GamesToGo.API.GameExecution
         
         public bool Ready { get; set; }
 
-        public Tile Tile { get; } = new Tile();
+        public Tile Tile { get; } = new Tile(-1);
 
         public Player(User user)
         {

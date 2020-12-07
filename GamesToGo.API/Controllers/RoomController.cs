@@ -13,7 +13,6 @@ namespace GamesToGo.API.Controllers
     [Authorize]
     public class RoomController : UserAwareController
     {
-        private static int roomID;
         private static readonly List<Room> rooms = new List<Room>();
 
         public RoomController(GamesToGoContext context) : base(context)
@@ -21,15 +20,14 @@ namespace GamesToGo.API.Controllers
         }
 
         [HttpPost("CreateRoom")]
-        public ActionResult<Room> CreateRoom([FromForm] string gameID)
+        public async Task<ActionResult<Room>> CreateRoom([FromForm] string gameID)
         {
             if (LoggedUser.Room != null)
                 return Conflict($"Already joined, leave current room to create another one");
-            Game game = Context.Game.Find(int.Parse(gameID));
+            Game game = await Context.Game.FindAsync(int.Parse(gameID));
             if (game == null)
                 return BadRequest($"Game ID {gameID} not found");
-            roomID++;
-            Room cRoom = new Room(roomID, LoggedUser, game);
+            Room cRoom = await Room.OpenRoom(LoggedUser, game);
             rooms.Add(cRoom);
             return cRoom;
         }

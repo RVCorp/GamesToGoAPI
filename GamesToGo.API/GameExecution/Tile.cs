@@ -4,12 +4,17 @@ namespace GamesToGo.API.GameExecution
 {
     public class Tile
     {
-        public int ID { get; set; }
+        public Tile(int typeID)
+        {
+            TypeID = typeID;
+        }
+
+        public int TypeID { get; }
         
-        public int TypeID { get; set; }
+        public List<Token> Tokens { get; } = new List<Token>();
         
-        public readonly List<Token> Tokens = new List<Token>();
+        public List<Card> Cards { get; } = new List<Card>();
         
-        public readonly List<Card> Cards = new List<Card>();
+        public Orientation Orientation { get; set; }
     }
 }
