@@ -148,7 +148,7 @@ namespace GamesToGo.API.Controllers
             Directory.Delete(filePath.Replace(".zip", ""));
             if (int.Parse(gameID) == -1 || (game = await Context.Game.FindAsync(int.Parse(gameID))) == null)
             {
-                game = new Game { Creator = LoggedUser };
+                game = new Game { Creator = await Context.User.FindAsync(LoggedUser.Id) };
                 await Context.Game.AddAsync(game);
             }
             
