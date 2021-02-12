@@ -126,11 +126,11 @@ namespace GamesToGo.API.GameExecution
                     {
                         for (int j = 0; j < Players.Length; j++)
                         {
-                            if (Players[i] == null)
+                            if (Players[j] == null)
                                 continue;
 
-                            Players[i].BackingUser.Room = null;
-                            Players[i] = null;
+                            Players[j].BackingUser.Room = null;
+                            Players[j] = null;
                         }
                     }
                         
@@ -147,7 +147,7 @@ namespace GamesToGo.API.GameExecution
             {
                 if (HasStarted)
                     return false;
-                Player targetPlayer = Players.FirstOrDefault(p => p.BackingUser.Id == user.Id);
+                Player targetPlayer = Players.FirstOrDefault(p => p?.BackingUser.Id == user.Id);
                 if (targetPlayer == null)
                     return false;
                 if (targetPlayer == Owner)
