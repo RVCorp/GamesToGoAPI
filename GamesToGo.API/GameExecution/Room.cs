@@ -664,7 +664,7 @@ namespace GamesToGo.API.GameExecution
             {
                 if (HasStarted)
                     return false;
-                Player targetPlayer = Players.FirstOrDefault(p => p.BackingUser.Id == user.Id);
+                Player targetPlayer = Players.FirstOrDefault(p => p?.BackingUser.Id == user.Id);
                 if (targetPlayer == null)
                     return false;
                 if (targetPlayer == Owner)
