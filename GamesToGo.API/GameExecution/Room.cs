@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -17,9 +16,9 @@ namespace GamesToGo.API.GameExecution
 
         [JsonIgnore] public readonly object Lock = new object();
 
-        private List<Board> blueprintBoards = new List<Board>();
-        private List<Token> blueprintTokens = new List<Token>();
-        private List<Card> blueprintCards = new List<Card>();
+        private readonly List<Board> blueprintBoards = new List<Board>();
+        private readonly List<Token> blueprintTokens = new List<Token>();
+        private readonly List<Card> blueprintCards = new List<Card>();
 
         public Player Owner { get; }
         public int ID { get; }
@@ -68,12 +67,13 @@ namespace GamesToGo.API.GameExecution
 
             Owner = Players[0];
 
-            ParseGame();
+            Parse(File.ReadAllLines($"Games/{Game.Hash}"), ref blueprintTokens, ref blueprintCards,
+                ref blueprintBoards);
         }
 
         public static async Task<Room> OpenRoom(User user, Game game)
         {
-            if (user.Game == null)
+            if (user == null || game == null)
                 return null;
 
             if (!await ParseDry(game))
@@ -94,11 +94,11 @@ namespace GamesToGo.API.GameExecution
             var dryTokens = new List<Token>();
             var dryCards = new List<Card>();
             var dryBoards = new List<Board>();
-            if (!Parse(gameLines, ref dryTokens, ref dryCards, ref dryBoards))
-                return false;
-
-            return true;
+            
+            return Parse(gameLines, ref dryTokens, ref dryCards, ref dryBoards);
         }
+        
+        #region Parsing
 
         private static int GetObjectTypeID(IReadOnlyList<string> lines)
         {
@@ -202,12 +202,6 @@ namespace GamesToGo.API.GameExecution
             return true;
         }
 
-        private void ParseGame()
-        {
-            Parse(File.ReadAllLines($"Games/{Game.Hash}"), ref blueprintTokens, ref blueprintCards,
-                ref blueprintBoards);
-        }
-
         private static bool Parse(IReadOnlyList<string> lines, ref List<Token> tokens, ref List<Card> cards,
             ref List<Board> boards)
         {
@@ -257,6 +251,9 @@ namespace GamesToGo.API.GameExecution
 
             var pendingTiles = new List<Tile>();
             var pendingBoardGroups = new List<List<string>>();
+            int highestID = 0;
+            
+            // Parse base elements (cards and tokens will be cloned in real time, others are there to stay)
 
             foreach (var group in groupedObjectLines)
             {
@@ -270,6 +267,8 @@ namespace GamesToGo.API.GameExecution
                                 tokens.Add(newToken);
                             else
                                 return false;
+                            if (newToken.TypeID > highestID)
+                                highestID = newToken.TypeID;
                             break;
                         case ElementType.Card:
                             Card newCard = ParseCard(group);
@@ -277,6 +276,8 @@ namespace GamesToGo.API.GameExecution
                                 cards.Add(newCard);
                             else
                                 return false;
+                            if (newCard.TypeID > highestID)
+                                highestID = newCard.TypeID;
                             break;
                         case ElementType.Tile:
                             Tile newTile = ParseTile(group);
@@ -284,6 +285,8 @@ namespace GamesToGo.API.GameExecution
                                 pendingTiles.Add(newTile);
                             else
                                 return false;
+                            if (newTile.TypeID > highestID)
+                                highestID = newTile.TypeID;
                             break;
                         case ElementType.Board:
                             pendingBoardGroups.Add(group);
@@ -305,10 +308,14 @@ namespace GamesToGo.API.GameExecution
                     boards.Add(newBoard);
                 else
                     return false;
+                if (newBoard.TypeID > highestID)
+                    highestID = newBoard.TypeID;
             }
 
             return true;
         }
+        
+        #endregion
 
         /*ProjectElement parsingElement = null;
 
@@ -636,11 +643,11 @@ namespace GamesToGo.API.GameExecution
                     {
                         for (int j = 0; j < Players.Length; j++)
                         {
-                            if (Players[i] == null)
+                            if (Players[j] == null)
                                 continue;
 
-                            Players[i].BackingUser.Room = null;
-                            Players[i] = null;
+                            Players[j].BackingUser.Room = null;
+                            Players[j] = null;
                         }
                     }
 
@@ -693,8 +700,7 @@ namespace GamesToGo.API.GameExecution
         public static explicit operator RoomPreview(Room r) => new RoomPreview(r);
     }
 
-    [SuppressMessage("ReSharper", "UnusedAutoPropertyAccessor.Global")]
-    public class RoomPreview
+    public record RoomPreview
     {
         public int ID { get; }
 

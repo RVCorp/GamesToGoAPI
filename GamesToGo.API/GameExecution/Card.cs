@@ -27,7 +27,7 @@ namespace GamesToGo.API.GameExecution
             
         }
 
-        public void MoveTo()
+        public void MoveTo(Tile tile)
         {
             
         }

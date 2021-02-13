@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using GamesToGo.API.GameExecution;
 using GamesToGo.API.Models;
+using Microsoft.AspNetCore.Http;
 
 namespace GamesToGo.API.Controllers
 {
@@ -24,10 +25,17 @@ namespace GamesToGo.API.Controllers
         {
             if (LoggedUser.Room != null)
                 return Conflict($"Already joined, leave current room to create another one");
+            
             Game game = await Context.Game.FindAsync(int.Parse(gameID));
+            
             if (game == null)
                 return BadRequest($"Game ID {gameID} not found");
+            
             Room cRoom = await Room.OpenRoom(LoggedUser, game);
+
+            if (cRoom == null)
+                return StatusCode(StatusCodes.Status422UnprocessableEntity);
+            
             rooms.Add(cRoom);
             return cRoom;
         }
@@ -84,13 +92,20 @@ namespace GamesToGo.API.Controllers
 
         public static bool LeaveRoom(User user)
         {
-            var toLeaveRoom = user?.Room;
-            if (toLeaveRoom == null || !(bool) toLeaveRoom?.LeaveUser(user))
-                return false;
-            if (((RoomPreview) toLeaveRoom).CurrentPlayers == 0)
+            var roomsJoined = rooms.Where(r => r.Players.Any(p => user.Id == p?.BackingUser.Id)).ToList();
+            while(roomsJoined.Any())
             {
-                UsersController.ClearInvitationsFor(toLeaveRoom);
-                rooms.Remove(toLeaveRoom);
+                var leaving = roomsJoined.First();
+                if (!leaving.LeaveUser(user))
+                    return false;
+                
+                roomsJoined.Remove(leaving);
+
+                if (((RoomPreview) leaving).CurrentPlayers > 0)
+                    continue;
+                
+                UsersController.ClearInvitationsFor(leaving);
+                rooms.Remove(leaving);
             }
 
             return true;
