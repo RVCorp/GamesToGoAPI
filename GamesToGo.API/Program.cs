@@ -3,6 +3,7 @@ using Microsoft.Extensions.Hosting;
 using System;
 using System.IO;
 using System.Linq;
+using GamesToGo.API.Controllers;
 using GamesToGo.API.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -16,7 +17,15 @@ namespace GamesToGo.API
             Console.WriteLine(Environment.CurrentDirectory);
             Console.WriteLine(System.Reflection.Assembly.GetExecutingAssembly().Location);
             Console.WriteLine(string.Join(' ', args));
-            Environment.CurrentDirectory = Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location);
+
+            string filesPath = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData,
+                    Environment.SpecialFolderOption.DoNotVerify),
+                @"GamesToGoAPI");
+
+            Directory.CreateDirectory(filesPath);
+            
+            Environment.CurrentDirectory = filesPath;
             var host = CreateHostBuilder(args).Build();
 
             if (args.Any(a => a == "--database"))
@@ -32,6 +41,7 @@ namespace GamesToGo.API
 
         public static IHostBuilder CreateHostBuilder(string[] args) =>
             Host.CreateDefaultBuilder(args)
+                .UseContentRoot(Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location)!)
                 .ConfigureWebHostDefaults(webBuilder =>
                 {
                     webBuilder.UseStartup<Startup>().UseUrls("http://*:5000");

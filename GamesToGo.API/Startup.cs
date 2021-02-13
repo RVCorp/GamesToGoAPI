@@ -53,8 +53,7 @@ namespace GamesToGo.API
             string connection = Configuration.GetConnectionString("ThisAintTheConnectionString");
             services.AddDbContext<GamesToGoContext>(options =>
             {
-                options.UseLazyLoadingProxies()
-                    .UseMySql(connection, ServerVersion.AutoDetect(connection));
+                options.UseMySql(connection, ServerVersion.AutoDetect(connection));
             });
         }
 

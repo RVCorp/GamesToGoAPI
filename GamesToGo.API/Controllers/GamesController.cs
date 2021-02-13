@@ -2,11 +2,9 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Security.Cryptography;
 using System.Threading.Tasks;
 using GamesToGo.API.Extensions;
 using GamesToGo.API.Models;
@@ -76,7 +74,7 @@ namespace GamesToGo.API.Controllers
         [Authorize]
         public async Task<ActionResult<Game>> DeleteGame(int id)
         {
-            var game = await Context.Game.FindAsync(id);
+            var game = await Context.Game.Include(g => g.Creator).SingleAsync(g => g.Id == id);
             if (game == null)
             {
                 return NotFound();
@@ -168,41 +166,38 @@ namespace GamesToGo.API.Controllers
             return Ok(new { ID = game.Id, game.Status });
         }
 
+        [HttpGet("GameFiles/{id}")]
+        [Authorize]
+        public ActionResult<string[]> FindGameFiles(int id)
+        {
+            var files = GetFilesForGame(id).ToArray();
+            if (files.Length == 0)
+                return NotFound("Game was not in database");
+            return files.ToArray();
+        }
+
         [HttpGet("DownloadProject/{id}")]
         [Authorize]
         public async Task<IActionResult> DownloadFile(int id)
         {
-            var game = await Context.Game.FindAsync(id);
-            string gameFile = $"Games/{game.Hash}";
-
+            var files = GetFilesForGame(id).ToArray();
+            
+            if (files.Length == 0)
+                return NotFound();
 
             using ZipFile zip = new ZipFile();
             var stream = new MemoryStream();
-            if (System.IO.File.Exists(gameFile))
+            
+            await Task.Run(() =>
             {
-                await Task.Run(() =>
-                {
-                    zip.AddFile(gameFile, "");
-                    string[] lines = System.IO.File.ReadAllLines(gameFile);
-                    for (int i = 0; i < lines.Length; i++)
-                    {
-                        string[] info = lines[i].Split('=');
-                        if (info[0] == "Files")
-                        {
-                            for (int j = 0; j < Int32.Parse(info[1]); j++)
-                            {
-                                zip.AddFile($"Games/{lines[i + j + 1]}", "");
-                            }
-                            break;
-                        }
-                    }
-                    zip.Save(stream);
-                });
-            }
-            else
-                return NotFound();
+                foreach(var file in files)
+                    zip.AddFile($"Games/{file}", "");
+                
+                zip.Save(stream);
+            });
+            
             stream.Seek(0, SeekOrigin.Begin);
-            return File(stream, "application/octet-stream", game.Hash + ".zip");
+            return File(stream, "application/octet-stream", files.First() + ".zip");
         }
 
         [HttpGet("DownloadFile/{hash}")]
@@ -218,15 +213,14 @@ namespace GamesToGo.API.Controllers
             else
                 return NotFound();
             stream.Seek(0, SeekOrigin.Begin);
-            return File(stream, "application/octet-stream", hash + ".zip");
+            return File(stream, "application/octet-stream", hash);
         }
 
         [HttpGet("AllGames")]
         [Authorize]
         public async Task<ActionResult<List<Game>>> GetGames()
         {
-            List<Game> i;
-            i = await Context.Game.Where(x => x.Creator.Id == LoggedUser.Id).ToListAsync();
+            var i = await Context.Game.Where(x => x.Creator.Id == LoggedUser.Id).Include(game => game.Creator).ToListAsync();
             return i;
         }
 
@@ -234,18 +228,48 @@ namespace GamesToGo.API.Controllers
         [Authorize]
         public async Task<ActionResult<List<Game>>> GetPublishedGames()
         {
-            List<Game> g;
-            g = await Context.Game.Where(x => x.Creator.Id == LoggedUser.Id && x.Status == 3).ToListAsync();
+            var g = await Context.Game.Where(x => x.Creator.Id == LoggedUser.Id && x.Status == 3).Include(game => game.Creator).ToListAsync();
             return g;
         }
 
         [HttpGet("AllPublishedGames")]
         [Authorize]
         public async Task<ActionResult<List<Game>>> GetAllPublishedGames()
-        { 
-            List<Game> g;
-            g = await Context.Game.Where(x => x.Status == 3).ToListAsync();
+        {
+            var g = await Context.Game.Where(x => x.Status == 3).Include(game => game.Creator).ToListAsync();
             return g;
+        }
+        
+        /// <summary>
+        /// Gets the list of files that a project was uploaded with
+        /// </summary>
+        /// <param name="id">The ID of the game</param>
+        /// <returns>An enumerable of hashes, including the hash of the game itself</returns>
+        public IEnumerable<string> GetFilesForGame(int id)
+        {
+            //Let's find the game in the database first...
+            var gameHash = Context.Game.Find(id)?.Hash;
+            
+            //ABORT! No such game was found in database!
+            if(gameHash == null)
+                yield break;
+            
+            var gameFile = $"Games/{gameHash}";
+
+            //ABORT! File was not found on file-system!
+            //TODO: What's good to do in this case?
+            if (!System.IO.File.Exists(gameFile))
+                yield break;
+
+            //Skip until we find the "Files = XX" line
+            var skippedLines = System.IO.File.ReadAllLines(gameFile).SkipWhile(l => !l.StartsWith("Files")).ToArray();
+
+            //We have to include the game file too (it is a file after all)
+            yield return gameHash;
+
+            //Add the rest of files
+            foreach(var file in skippedLines.Skip(1).Take(int.Parse(skippedLines.First().Split('=')[1])).ToArray())
+                yield return file;
         }
 
         private bool GameExists(int id)

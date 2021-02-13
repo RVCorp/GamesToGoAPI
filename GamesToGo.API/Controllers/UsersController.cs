@@ -89,8 +89,7 @@ namespace GamesToGo.API.Controllers
                 return BadRequest("");
             await Context.UserLogin.AddAsync(user);
             await Context.SaveChangesAsync();
-            var returnUser = await Context.User.FindAsync(user.User);
-            return CreatedAtAction("GetUser", returnUser);
+            return CreatedAtAction("GetUser", await Context.User.FindAsync(user.User));
         }
 
         [HttpPost("UploadImage")]

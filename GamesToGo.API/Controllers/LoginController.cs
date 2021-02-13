@@ -11,6 +11,8 @@ using System.Text;
 using System.Threading;
 using GamesToGo.API.Extensions;
 using GamesToGo.API.Models;
+using Microsoft.EntityFrameworkCore;
+
 //using Microsoft.Net.Http.Headers;
 
 namespace GamesToGo.API.Controllers
@@ -45,8 +47,7 @@ namespace GamesToGo.API.Controllers
                     return null;
                 if (onlineUser.LogoutTime <= DateTime.Now)
                 {
-                    if (onlineUser.Room != null)
-                        RoomController.LeaveRoom(onlineUser);
+                    RoomController.LeaveRoom(onlineUser);
                     onlineUsers.Remove(lookup);
                     return null;
                 }
@@ -58,7 +59,7 @@ namespace GamesToGo.API.Controllers
         public static User GetOnlineUserForClaims(IEnumerable<Claim> claims, GamesToGoContext context)
         {
             int userID = int.Parse(claims.ElementAt(3).Value);
-            addOnlineUser(context.User.Find(userID));
+            addOnlineUser(context.User.AsNoTracking().Single(u => u.Id == userID));
             return getOnlineUser(userID);
         }
 
@@ -119,8 +120,7 @@ namespace GamesToGo.API.Controllers
             lock (onlineUsersLock)
             {
                 UsersController.ClearInvitationsFor(user);
-                if (user.Room != null)
-                    RoomController.LeaveRoom(user);
+                RoomController.LeaveRoom(user);
                 onlineUsers.Remove(user.Id);
             }
         }
@@ -142,7 +142,7 @@ namespace GamesToGo.API.Controllers
         {
             //bool mobileLogin = Request.Headers[HeaderNames.UserAgent].Any(ua => ua == "gtg-app");
 
-            var user = Context.UserLogin.Where(x => x.User.Username == username || x.Email == username).FirstOrDefault(x => x.Password == pass);
+            var user = Context.UserLogin.Where(x => x.User.Username == username || x.Email == username).Include(ul => ul.User).AsNoTracking().FirstOrDefault(x => x.Password == pass);
 
             if (user == null)
                 return Unauthorized();
