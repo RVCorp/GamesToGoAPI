@@ -87,7 +87,7 @@ namespace GamesToGo.API.Controllers
         public static bool LeaveRoom(User user)
         {
             var toLeaveRoom = user?.Room;
-            if (toLeaveRoom == null || !(bool) toLeaveRoom?.LeaveUser(user))
+            if (toLeaveRoom == null || !toLeaveRoom.LeaveUser(user))
                 return false;
             if (((RoomPreview) toLeaveRoom).CurrentPlayers == 0)
             {
