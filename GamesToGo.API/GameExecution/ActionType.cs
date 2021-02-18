@@ -1,0 +1,29 @@
+﻿namespace GamesToGo.API.GameExecution
+{
+    public enum ActionType
+    {
+        AddCardToToTile,
+        ChangeCardPrivacy,
+        ChangeTokenPrivacy,
+        DelayGame,
+        DelayTile,
+        GiveCardFromPlayerToPlayer,
+        GivePlayerATokenType,
+        GivePlayerATokenTypeFromPlayer,
+        GivePlayerXCardsFromTileAction,
+        GivePlayerXTokensTypeAction,
+        GiveXCardsAToken,
+        MoveCardFromPlayerTileToTile,
+        MoveCardFromPlayerToTile,
+        MoveCardFromPlayerToTileInXPosition,
+        MoveXCardsFromPlayerToTile,
+        PlayerStatesOfDefeat,
+        PlayerWins,
+        RemovePlayer,
+        RemoveTokenTypeFromCard,
+        RemoveTokenTypeFromPlayer,
+        ShuffleTile,
+        StopTileDelay,
+        StopTileEvents,
+    }
+}

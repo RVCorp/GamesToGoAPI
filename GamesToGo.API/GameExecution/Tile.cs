@@ -14,6 +14,8 @@ namespace GamesToGo.API.GameExecution
         public List<Token> Tokens { get; } = new List<Token>();
         
         public List<Card> Cards { get; } = new List<Card>();
+
+        public List<EventParameter> Events { get; } = new List<EventParameter>();
         
         public Orientation Orientation { get; set; }
     }
