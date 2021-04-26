@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
@@ -181,7 +181,10 @@ namespace GamesToGo.API.GameExecution
                         card.SideVisible = Enum.Parse<SideVisible>(section.Value);
                         break;
                     case "Events":
-                        card.Events.AddRange( DivideEvents(section));
+                        var possibleEvents = DivideEvents(section);
+                        if (possibleEvents == null)
+                            return null;
+                        card.Events.AddRange(possibleEvents);
                         break;
                 }
             }
@@ -210,7 +213,10 @@ namespace GamesToGo.API.GameExecution
                         break;
                     }
                     case "Events":
-                        tile.Events.AddRange(DivideEvents(section));
+                        var possibleEvents = DivideEvents(section);
+                        if (possibleEvents == null)
+                            return null;
+                        tile.Events.AddRange(possibleEvents);
                         break;
                 }
             }
@@ -260,23 +266,45 @@ namespace GamesToGo.API.GameExecution
                 switch (section.Name)
                 {
                     case "PreparationTurn":
+                    {
                         foreach (string preparationLine in section.ExtraLines)
-                            PreparationParameters.Add(DivideAction(preparationLine));
+                        {
+                            var possibleAction = DivideAction(preparationLine);
+                            if (possibleAction == null)
+                                return ParsingError.PreparationTurn;
+                            PreparationParameters.Add(possibleAction);
+                        }
+
                         if (PreparationParameters.Count != int.Parse(section.Value))
                             return ParsingError.PreparationTurn;
                         break;
+                    }
                     case "VictoryConditions":
+                    {
                         foreach (string victoryLine in section.ExtraLines)
-                            VictoryConditions.Add(DivideAction(victoryLine));
+                        {
+                            var possibleAction = DivideAction(victoryLine);
+                            if (possibleAction == null)
+                                return ParsingError.VictoryConditions;
+                            VictoryConditions.Add(possibleAction);
+                        }
                         if (VictoryConditions.Count != int.Parse(section.Value))
                             return ParsingError.VictoryConditions;
                         break;
+                    }
                     case "Turns":
+                    {
                         foreach (string actionLine in section.ExtraLines)
-                            Turns.Add(DivideAction(actionLine));
+                        {
+                            var possibleAction = DivideAction(actionLine);
+                            if (possibleAction == null)
+                                return ParsingError.Turns;
+                            Turns.Add(possibleAction);
+                        }
                         if (Turns.Count != int.Parse(section.Value))
                             return ParsingError.Turns;
                         break;
+                    }
                 }
             }
             
@@ -349,8 +377,40 @@ namespace GamesToGo.API.GameExecution
 
             if (dividedLine.Length != 2 || !int.TryParse(dividedLine[0], out int id))
                 return null;
+
+            var argumentsLine = dividedLine[1][..^1];
             
-            return (id, dividedLine[1][..^1].Split(','));
+            int parenthesisOpenCount = 0, parenthesisCloseCount = 0, lastStart = 0;
+            var argumentsList = new List<string>();
+
+            for (int i = 0; i < argumentsLine.Length; i++)
+            {
+                switch (argumentsLine[i])
+                {
+                    case '(':
+                        parenthesisOpenCount++;
+
+                        break;
+                    case ')':
+                        parenthesisCloseCount++;
+
+                        break;
+                    case ',':
+                        if (parenthesisOpenCount == parenthesisCloseCount)
+                        {
+                            if (i != lastStart)
+                                argumentsList.Add(argumentsLine.Substring(lastStart, i - lastStart));
+                            lastStart = i + 1;
+                        }
+
+                        break;
+                }
+            }
+
+            if (parenthesisOpenCount == parenthesisCloseCount)
+                argumentsList.Add(argumentsLine.Substring(lastStart));
+            
+            return (id, argumentsList.ToArray());
         }
         
         #endregion
@@ -388,21 +448,31 @@ namespace GamesToGo.API.GameExecution
                         return null;
 
                     var valuedEventDescriptors = eventDescriptors.Value;
+                    
+                    var arguments = valuedEventDescriptors.Arguments.Select(DivideArgument).ToList();
+
+                    if (arguments.Any(a => a == null))
+                        return null;
 
                     currentEventParameter = new EventParameter
                     {
                         Type = (EventType)valuedEventDescriptors.Type,
                         Priority = int.Parse(parts[3]), 
                         Conditional = DivideArgument(parts[4]),
-                        Arguments = valuedEventDescriptors.Arguments.Select(DivideArgument).ToList(),
+                        Arguments = arguments,
                     };
                 }
                 else
                 {
                     if (actions.Capacity == actions.Count)
                         return null;
+
+                    var possibleAction = DivideAction(line);
+
+                    if (possibleAction == null)
+                        return null;
                     
-                    actions.Add(DivideAction(line));
+                    actions.Add(possibleAction);
                 }
             }
 
@@ -441,16 +511,20 @@ namespace GamesToGo.API.GameExecution
                 return new ArgumentParameter
                 {
                     Type = argumentType,
-                    Arguments = null,
                     Result = new List<int>(1) { result },
                 };
             }
 
+            var arguments = valuedArgumentDescriptors.Arguments.Select(DivideArgument).ToList();
+
+            if (arguments.Any(a => a == null))
+                return null;
+
             var argument = new ArgumentParameter
             {
                 Type = argumentType,
-                Arguments = valuedArgumentDescriptors.Arguments.Select(DivideArgument).ToList(),
                 Result = null,
+                Arguments = arguments,
             };
             
             return argument.Arguments.Any(arg => arg == null) ? null : argument;
@@ -472,12 +546,17 @@ namespace GamesToGo.API.GameExecution
                 return null;
 
             var valuedActionDescriptors = actionDescriptors.Value;
+
+            var arguments = valuedActionDescriptors.Arguments.Select(DivideArgument).ToList();
+
+            if (arguments.Any(a => a == null))
+                return null;
                 
             return new ActionParameter
             {
-                Type = (ActionType)valuedActionDescriptors.Type, 
+                Type = (ActionType)valuedActionDescriptors.Type,
                 Conditional = DivideArgument(parts[1]),
-                Arguments = valuedActionDescriptors.Arguments.Select(DivideArgument).ToList(),
+                Arguments = arguments,
             };
         }
         
