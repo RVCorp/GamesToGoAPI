@@ -20,6 +20,8 @@ namespace GamesToGo.API.GameExecution
 
         public SideVisible SideVisible { get; set; }
 
+        public List<EventParameter> Events { get; } = new List<EventParameter>();
+
         public List<Token> Tokens { get; } = new List<Token>();
 
         public void MoveFrom(Tile tile)

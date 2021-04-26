@@ -20,22 +20,17 @@ namespace GamesToGo.API.GameExecution
             get => count;
             set
             {
-                if(value < 0)
+                if (value < 0)
                     throw new InvalidOperationException(@$"Can't have less than 0 tokens (token type: {TypeID}");
             }
         }
 
-        public Token CloneEmpty()
+        public Token Clone()
         {
-            return new Token(TypeID);
-        }
-
-        public static Token operator +(Token a, Token b)
-        {
-            if(!a.Equals(b))
-                throw new ArgumentException($"Can't add different Token types (received types {a.TypeID} & {b.TypeID})");
-            a.Count += b.Count;
-            return a;
+            return new Token(TypeID)
+            {
+                Privacy = Privacy,
+            };
         }
 
         public override bool Equals(object obj)
