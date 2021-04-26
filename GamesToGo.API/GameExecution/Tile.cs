@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Numerics;
 
 namespace GamesToGo.API.GameExecution
 {
@@ -13,10 +14,12 @@ namespace GamesToGo.API.GameExecution
         
         public List<Token> Tokens { get; } = new List<Token>();
         
-        public List<Card> Cards { get; } = new List<Card>();
+        public IReadOnlyList<Card> Cards { get; } = new List<Card>();
 
         public List<EventParameter> Events { get; } = new List<EventParameter>();
         
         public Orientation Orientation { get; set; }
+
+        public Vector2 Arrangement { get; set; }
     }
 }

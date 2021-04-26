@@ -6,7 +6,7 @@ namespace GamesToGo.API.Extensions
 {
     public static class HashingExtensions
     {
-        public static string SHA256(this string text) => Encoding.UTF8.GetBytes(text).SHA256();
+        public static string SHA256(this string text) => Encoding.Unicode.GetBytes(text).SHA256();
         
         public static string SHA256(this byte[] bytes) // Lo mismo pero SHA256
         {
@@ -14,7 +14,7 @@ namespace GamesToGo.API.Extensions
             return hasher.ComputeHash(bytes).ToHashString();
         }
         
-        public static string SHA1(this string text) => Encoding.UTF8.GetBytes(text).SHA1();
+        public static string SHA1(this string text) => Encoding.Unicode.GetBytes(text).SHA1();
 
         public static string SHA1(this byte[] bytes) //Obtiene SHA1 de una secuencia de bytes
         {

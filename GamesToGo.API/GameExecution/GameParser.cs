@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Numerics;
 
 namespace GamesToGo.API.GameExecution
 {
@@ -8,34 +9,49 @@ namespace GamesToGo.API.GameExecution
     {
         private int fileVersion;
         
-        public bool Parse(IReadOnlyList<string> lines, ref List<Token> tokens, ref List<Card> cards,
-            ref List<Board> boards)
+        public List<Token> Tokens { get; } = new List<Token>();
+        public List<Card> Cards { get; } = new List<Card>();
+        public List<Board> Boards { get; } = new List<Board>();
+
+        public List<ActionParameter> Turns { get; } = new List<ActionParameter>();
+        public List<ActionParameter> VictoryConditions { get; } = new List<ActionParameter>();
+        public List<ActionParameter> PreparationParameters { get; } = new List<ActionParameter>();
+
+        /// <summary>
+        /// Parses a game based on the lines sent, populating the stateful lists in the process.
+        /// </summary>
+        /// <param name="lines">The lines that make up a game</param>
+        /// <returns><see cref="ParsingError.Ok"/> if correct, a value describing the error otherwise</returns>
+        public ParsingError Parse(string[] lines)
         {
             var infoLines = new List<string>();
             var objectLines = new List<string>();
             var groupedObjectLines = new List<List<string>>();
 
             bool isParsingObjects = false;
-            foreach (var line in lines)
-            {
-                if (line.StartsWith("Version") && !int.TryParse(line.Split('=')[1], out fileVersion))
-                    return false;
-                
-                isParsingObjects = line switch
-                {
-                    "[Info]" => false,
-                    "[Objects]" => true,
-                    _ => isParsingObjects,
-                };
 
-                if (line.StartsWith('['))
+            if (lines[0] != "[Info]")
+                return ParsingError.InfoHeader;
+
+            if (!TryGetVersion(lines[1]))
+                return ParsingError.Version;
+
+            foreach (var line in lines[ParametersStartingLine..])
+            {
+                if (line == "[Objects]")
+                {
+                    isParsingObjects = true;
                     continue;
+                }
                 
                 if (isParsingObjects)
                     objectLines.Add(line);
                 else
                     infoLines.Add(line);
             }
+
+            if (objectLines.Count == 0)
+                return ParsingError.ObjectsHeader;
 
             var objectLineGroup = new List<string>();
 
@@ -67,66 +83,69 @@ namespace GamesToGo.API.GameExecution
                     var parameters = DivideGroup(group.Skip(1));
 
                     if (parameters == null)
-                        return false;
+                        return ParsingError.ParameterGroup;
                     
-                    switch (Enum.Parse<ElementType>(group.First()[..0]))
+                    switch (Enum.Parse<ElementType>($"{group.First()[0]}"))
                     {
                         case ElementType.Token:
                             Token newToken = ParseToken(id, parameters);
                             if (newToken != null)
-                                tokens.Add(newToken);
+                                Tokens.Add(newToken);
                             else
-                                return false;
+                                return ParsingError.Token;
                             break;
                         case ElementType.Card:
                             Card newCard = ParseCard(id, parameters);
                             if (newCard != null)
-                                cards.Add(newCard);
+                                Cards.Add(newCard);
                             else
-                                return false;
+                                return ParsingError.Card;
                             break;
                         case ElementType.Tile:
                             Tile newTile = ParseTile(id, parameters);
                             if (newTile != null)
                                 pendingTiles.Add(newTile);
                             else
-                                return false;
+                                return ParsingError.Tile;
                             break;
                         case ElementType.Board:
                             pendingBoardGroups.Add((id, parameters));
                             break;
                         default:
-                            return false;
+                            return ParsingError.UnknownObject;
                     }
                 }
                 catch
                 {
-                    return false;
+                    return ParsingError.Object;
                 }
-                
-                //Parse info lines
-
-                if (!ParseInfoLines(DivideGroup(infoLines)))
-                    return false;
             }
+            
+            //Parse general sections
+
+            var infoSectionsResult = ParseInfoSections(DivideGroup(infoLines));
+            if (infoSectionsResult != ParsingError.Ok)
+                return infoSectionsResult;
 
             foreach (var pendingBoard in pendingBoardGroups)
             {
-                Board newBoard = ParseBoard(pendingBoard.id, pendingBoard.parameters, pendingTiles);
+                var newBoard = ParseBoard(pendingBoard.id, pendingBoard.parameters, pendingTiles);
                 
                 if (newBoard != null)
-                    boards.Add(newBoard);
+                    Boards.Add(newBoard);
                 else
-                    return false;
+                    return ParsingError.Board;
             }
 
-            return true;
+            return ParsingError.Ok;
         }
+        
+        #region Object Parsing
         
         private int GetObjectTypeID(IReadOnlyList<string> lines)
         {
             string first = lines[0];
-            return int.TryParse(first[2..first.IndexOf('|', 2)], out int ret) ? 0 : ret;
+            return int.TryParse(first[2..first.IndexOf('|', 2)], out int ret) ? ret : 0;
         }
 
         private Token ParseToken(int id, IReadOnlyList<ElementParameter> parameters)
@@ -162,7 +181,7 @@ namespace GamesToGo.API.GameExecution
                         card.SideVisible = Enum.Parse<SideVisible>(section.Value);
                         break;
                     case "Events":
-                        card.Events.AddRange(DivideEvents(section));
+                        card.Events.AddRange( DivideEvents(section));
                         break;
                 }
             }
@@ -180,6 +199,16 @@ namespace GamesToGo.API.GameExecution
                     case "Orient":
                         tile.Orientation = Enum.Parse<Orientation>(section.Value);
                         break;
+                    case "Arrangement":
+                    {
+                        var vector = DivideVector(section.Value);
+
+                        if (!vector.HasValue)
+                            return null;
+
+                        tile.Arrangement = vector.Value;
+                        break;
+                    }
                     case "Events":
                         tile.Events.AddRange(DivideEvents(section));
                         break;
@@ -207,6 +236,8 @@ namespace GamesToGo.API.GameExecution
                             if (possibleTile == null)
                                 return null;
 
+                            pendingTiles.Remove(possibleTile);
+
                             board.Tiles.Add(possibleTile);
                         }
 
@@ -217,11 +248,51 @@ namespace GamesToGo.API.GameExecution
 
             return board;
         }
+        
+        #endregion
 
-        private bool ParseInfoLines(IReadOnlyList<ElementParameter> infoLines)
+        #region Game-wise Parsing
+
+        private ParsingError ParseInfoSections(IReadOnlyList<ElementParameter> infoSections)
         {
-            return infoLines != null;
+            foreach (var section in infoSections)
+            {
+                switch (section.Name)
+                {
+                    case "PreparationTurn":
+                        foreach (string preparationLine in section.ExtraLines)
+                            PreparationParameters.Add(DivideAction(preparationLine));
+                        if (PreparationParameters.Count != int.Parse(section.Value))
+                            return ParsingError.PreparationTurn;
+                        break;
+                    case "VictoryConditions":
+                        foreach (string victoryLine in section.ExtraLines)
+                            VictoryConditions.Add(DivideAction(victoryLine));
+                        if (VictoryConditions.Count != int.Parse(section.Value))
+                            return ParsingError.VictoryConditions;
+                        break;
+                    case "Turns":
+                        foreach (string actionLine in section.ExtraLines)
+                            Turns.Add(DivideAction(actionLine));
+                        if (Turns.Count != int.Parse(section.Value))
+                            return ParsingError.Turns;
+                        break;
+                }
+            }
+            
+            return ParsingError.Ok;
         }
+
+        private bool TryGetVersion(string versionLine)
+        {
+            if (versionLine.StartsWith("Version") && !int.TryParse(versionLine.Split('=')[1], out fileVersion))
+                return false;
+            return true;
+        }
+        
+        #endregion
+        
+        #region Assignment Parameters
 
         private IReadOnlyList<ElementParameter> DivideGroup(IEnumerable<string> group)
         {
@@ -247,7 +318,7 @@ namespace GamesToGo.API.GameExecution
                         Value = parts[1],
                     };
                 }
-                else
+                else if (!StringIsEmptyNullOrWhitespace(line))
                 {
                     currentParameter?.ExtraLines.Add(line);
                 }
@@ -268,16 +339,25 @@ namespace GamesToGo.API.GameExecution
             };
         }
         
+        #endregion
+        
+        #region Parenthesis Parameters
+        
         private (int Type, string[] Arguments)? SeparateParenthesisParameter(string parenthesisParameter)
         {
             string[] dividedLine = parenthesisParameter.Split('(', 2);
 
             if (dividedLine.Length != 2 || !int.TryParse(dividedLine[0], out int id))
                 return null;
-
+            
             return (id, dividedLine[1][..^1].Split(','));
         }
+        
+        #endregion
+        
+        #region Events, Actions and Arguments
 
+        //TODO: Divide into 2 functions: One for a group of events, one for a singular event
         private IReadOnlyList<EventParameter> DivideEvents(ElementParameter eventsParameter)
         {
             var events = new List<EventParameter>(int.Parse(eventsParameter.Value));
@@ -292,6 +372,7 @@ namespace GamesToGo.API.GameExecution
                     if (currentEventParameter != null)
                     {
                         events.Add(currentEventParameter);
+                        currentEventParameter.Actions = actions;
                     }
                     
                     var parts = line.Split('|');
@@ -324,9 +405,12 @@ namespace GamesToGo.API.GameExecution
                     actions.Add(DivideAction(line));
                 }
             }
-            
-            if(currentEventParameter != null)
+
+            if (currentEventParameter != null)
+            {
+                currentEventParameter.Actions = actions;
                 events.Add(currentEventParameter);
+            }
 
             return events;
         }
@@ -358,7 +442,7 @@ namespace GamesToGo.API.GameExecution
                 {
                     Type = argumentType,
                     Arguments = null,
-                    Result = result,
+                    Result = new List<int>(1) { result },
                 };
             }
 
@@ -397,7 +481,35 @@ namespace GamesToGo.API.GameExecution
             };
         }
         
+        #endregion
+        
+        #region Helping Functions
+        
+        private bool TryParseValidateEnum<TEnum>(string sectionValue, out TEnum output) where TEnum : struct, Enum
+        {
+            bool success = typeof(TEnum) switch
+            {
+                _ => Enum.TryParse(sectionValue, out output),
+            };
+
+            return success && Enum.IsDefined(typeof(TEnum), output);
+        }
+
+        private Vector2? DivideVector(string sectionValue)
+        {
+            string[] xy = sectionValue.Split('|');
+            if (xy.Length != 2)
+                return null;
+            return new Vector2(float.Parse(xy[0]), float.Parse(xy[1]));
+        }
+        
         private static bool StringIsEmptyNullOrWhitespace(string s) =>
             string.IsNullOrEmpty(s) || string.IsNullOrWhiteSpace(s);
+
+        private bool HasVersion => fileVersion > 0;
+
+        private int ParametersStartingLine => HasVersion ? 2 : 1;
+
+        #endregion
     }
 }

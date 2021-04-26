@@ -1,12 +1,15 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Hosting;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using GamesToGo.API.Controllers;
+using GamesToGo.API.GameExecution;
 using GamesToGo.API.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Newtonsoft.Json;
 
 namespace GamesToGo.API
 {
@@ -14,6 +17,30 @@ namespace GamesToGo.API
     {
         public static void Main(string[] args)
         {
+            Console.WriteLine(JsonConvert.SerializeObject(new ArgumentParameter
+            {
+                Type = ArgumentType.PlayerCardsWithToken,
+                Arguments = new List<ArgumentParameter>
+                {
+                    new ArgumentParameter
+                    {
+                        Type = ArgumentType.DefaultArgument,
+                        Result = new List<int>
+                        {
+                            1,
+                        },
+                    },
+                    new ArgumentParameter
+                    {
+                        Type = ArgumentType.TokenType,
+                        Result = new List<int>()
+                        {
+                            5,
+                        },
+                    },
+                },
+            }, Formatting.Indented));
+            
             Console.WriteLine(Environment.CurrentDirectory);
             Console.WriteLine(System.Reflection.Assembly.GetExecutingAssembly().Location);
             Console.WriteLine(string.Join(' ', args));

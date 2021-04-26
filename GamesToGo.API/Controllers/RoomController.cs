@@ -31,13 +31,18 @@ namespace GamesToGo.API.Controllers
             if (game == null)
                 return BadRequest($"Game ID {gameID} not found");
             
-            Room cRoom = await Room.OpenRoom(LoggedUser, game);
+            (Room Room, ParsingError Status) cRoom = await Room.OpenRoom(LoggedUser, game);
 
-            if (cRoom == null)
-                return StatusCode(StatusCodes.Status422UnprocessableEntity);
+            if (cRoom.Room == null)
+            {
+                return StatusCode(StatusCodes.Status422UnprocessableEntity, new
+                {
+                    status = cRoom.Status.ToString(),
+                });
+            }
             
-            rooms.Add(cRoom);
-            return cRoom;
+            rooms.Add(cRoom.Room);
+            return cRoom.Room;
         }
 
         [HttpGet("AllRoomsFor/{id}")]

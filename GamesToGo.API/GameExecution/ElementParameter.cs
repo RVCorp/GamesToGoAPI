@@ -8,6 +8,6 @@ namespace GamesToGo.API.GameExecution
             
         public string Value { get; init; }
 
-        public List<string> ExtraLines { get; init; }
+        public List<string> ExtraLines { get; } = new List<string>();
     }
 }

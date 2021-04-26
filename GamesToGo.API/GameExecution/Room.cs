@@ -2,8 +2,10 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Numerics;
 using System.Text;
 using System.Threading.Tasks;
+using GamesToGo.API.Controllers;
 using GamesToGo.API.Extensions;
 using GamesToGo.API.Models;
 using Newtonsoft.Json;
@@ -15,10 +17,12 @@ namespace GamesToGo.API.GameExecution
         private static int latestCreatedRoom;
 
         [JsonIgnore] public readonly object Lock = new object();
-
-        private readonly List<Board> blueprintBoards = new List<Board>();
-        private readonly List<Token> blueprintTokens = new List<Token>();
-        private readonly List<Card> blueprintCards = new List<Card>();
+        
+        private readonly List<Token> blueprintTokens;
+        private readonly List<Card> blueprintCards;
+        private readonly CircularList<ActionParameter> blueprintTurns;
+        private readonly List<ActionParameter> blueprintPreparationTurn;
+        private readonly List<ActionParameter> blueprintVictoryConditions;
 
         public Player Owner { get; }
         public int ID { get; }
@@ -37,28 +41,46 @@ namespace GamesToGo.API.GameExecution
             }
         }
 
-        public List<Board> Boards { get; } = new List<Board>();
+        public IReadOnlyList<Board> Boards { get; }
+
+        private readonly Dictionary<int, Tile> currentTiles = new Dictionary<int, Tile>();
+
+        private readonly Dictionary<int, Card> currentCards = new Dictionary<int, Card>();
 
         [JsonIgnore] private DateTime? timeStarted;
 
         public bool HasStarted
         {
             get => timeStarted.HasValue;
-            set
+            private set
             {
                 if (!value || HasStarted)
                     return;
+                
+                ExecutePreparationTurn();
+                
                 timeStarted = DateTime.Now;
             }
         }
 
         public double TimeElapsed => timeStarted == null ? 0 : (DateTime.Now - timeStarted).Value.TotalMilliseconds;
 
-        private Room(User user, Game game)
+        private Room(User user, Game game, GameParser parser)
         {
             ID = ++latestCreatedRoom;
 
             Game = game;
+            
+            Boards = parser.Boards;
+
+            foreach (var tile in parser.Boards.SelectMany(board => board.Tiles))
+                currentTiles.Add(tile.TypeID, tile);
+            
+            blueprintTurns = new CircularList<ActionParameter>(parser.Turns);
+            blueprintCards = parser.Cards;
+            blueprintTokens = parser.Tokens;
+            blueprintPreparationTurn = parser.PreparationParameters;
+            blueprintVictoryConditions = parser.VictoryConditions;
 
             lock (Lock)
                 Players = new Player[Game.Maxplayers];
@@ -66,36 +88,28 @@ namespace GamesToGo.API.GameExecution
             JoinUser(user);
 
             Owner = Players[0];
-
-            new GameParser().Parse(File.ReadAllLines($"Games/{Game.Hash}"), ref blueprintTokens, ref blueprintCards,
-                ref blueprintBoards);
         }
 
-        public static async Task<Room> OpenRoom(User user, Game game)
+        public static async Task<(Room, ParsingError)> OpenRoom(User user, Game game)
         {
             if (user == null || game == null)
-                return null;
+                return (null, ParsingError.Null);
 
-            if (!await ParseDry(game))
-                return null;
+            var gamePath = $"Games/{game.Hash}";
 
-            return new Room(user, game);
-        }
-
-        private static async Task<bool> ParseDry(Game game)
-        {
-            if (!File.Exists($"Games/{game.Hash}"))
-                return false;
-            var gameBytes = await File.ReadAllBytesAsync($"Games/{game.Hash}");
-            if (gameBytes.SHA1() != game.Hash)
-                return false;
-            var gameLines = Encoding.UTF8.GetString(gameBytes)
-                .Split(new[] {"\n\r", "\r\n", "\n"}, StringSplitOptions.None);
-            var dryTokens = new List<Token>();
-            var dryCards = new List<Card>();
-            var dryBoards = new List<Board>();
+            if (!File.Exists(gamePath))
+                return (null, ParsingError.NoFile);
             
-            return new GameParser().Parse(gameLines, ref dryTokens, ref dryCards, ref dryBoards);
+            if (game.Hash != (await File.ReadAllBytesAsync(gamePath)).SHA1())
+                return (null, ParsingError.WrongHash);
+            
+            var gameLines = await File.ReadAllLinesAsync(gamePath);
+
+            var parser = new GameParser();
+            var status = parser.Parse(gameLines);
+            return status == ParsingError.Ok
+                ? (new Room(user, game, parser), status)
+                : (null, status);
         }
 
         public bool JoinUser(User user)
@@ -195,20 +209,506 @@ namespace GamesToGo.API.GameExecution
             return true;
         }
 
-        public Player PlayerAtIndex(int index) => Players[index % Players.Length];
+        private readonly PriorityQueue<ActionParameter> actionQueue = new PriorityQueue<ActionParameter>();
 
-        public Player PlayerAtIndexAfterPlayer(int index, Player player) =>
-            Players[(index + player.RoomPosition) % Players.Length];
+        private ActionParameter currentAction;
 
-        public Player PlayerAtIndexBeforePlayer(int index, Player player)
+        public ArgumentParameter UserActionArgument { get; set; }
+
+        private void Execute(bool activateEvents = true)
         {
-            int targetIndex = player.RoomPosition - (index % Players.Length);
-            return targetIndex < 0 ? Players[Players.Length + targetIndex] : Players[targetIndex];
+            // An action was interrupted because we needed help from a user
+            // See if the user has interacted and continue if so
+            if (currentAction != null)
+            {
+                PrepareAction(activateEvents);
+                 
+                // We still need some help from user
+                // Wait until next iteration
+                if (currentAction != null)
+                    return;
+            }
+
+            // First try to execute existing items in the queue
+            if (actionQueue.TryDequeue(out var actionToClone))
+            {
+                currentAction = actionToClone.Clone();
+                PrepareAction(activateEvents);
+            }
+            // If there are no items in queue, do something from the turns
+            else if (blueprintTurns.MoveNext())
+            {
+                currentAction = blueprintTurns.Current.Clone();
+                PrepareAction(activateEvents);
+            }
+            // ABORT! The turns are empty somehow???
+            // If we get to here, something went horribly wrong in GameParser.Parse()  !!
+            else if (blueprintTurns.Count == 0)
+            {
+                RoomController.LeaveRoom(Owner.BackingUser);
+            }
+            // DOUBLE ABORT!
+            // Somehow somewhere things wrecked themselved unimaginably
+            // Investigate if more logging is necessary to get to this point
+            else
+            {
+                throw new InvalidOperationException($"Room {ID} entered an invalid state");
+            }
+            
+            // To finish the cycle, get victory conditions and run all and every single one of them
+            if (blueprintVictoryConditions.Count == 0)
+                throw new InvalidOperationException($"Room {ID} was initialized without victory conditions");
+
+            foreach (var victoryCondition in blueprintVictoryConditions)
+            {
+                var usableVictoryCondition = victoryCondition.Clone();
+
+                var condition = usableVictoryCondition.Conditional ??
+                                usableVictoryCondition.Arguments.First(a =>
+                                    a.Type.ReturnType() == ArgumentReturnType.Comparison);
+
+                if (InterpretConditional(condition))
+                {
+                    //TODO: Get list of winning sons
+                }
+            }
         }
 
-        public Player PlayerAfter(Player player) => PlayerAtIndexAfterPlayer(1, player);
+        /// <summary>
+        /// Excecutes an action set in the <see cref="currentAction"/> variable.
+        /// </summary>
+        /// <summary>
+        /// Will try to excecute with current state of arguments, if successful then will set <see cref="currentAction"/> to null
+        /// If not successful, will populate <see cref="UserActionArgument"/> with the argument the client needs to solve to continue 
+        /// </summary>
+        /// <remarks>
+        /// If no action is set, an exception might be thrown.
+        /// </remarks>
+        /// <exception cref="NullReferenceException">Thrown if <see cref="currentAction"/> is null</exception>
+        private void PrepareAction(bool activateEvents)
+        {
+            if (currentAction == null)
+                throw new NullReferenceException($"{nameof(currentAction)} was found to be null, game cannot continue");
 
-        public Player PlayerBefore(Player player) => PlayerAtIndexBeforePlayer(1, player);
+            if (!InterpretConditional(currentAction))
+            {
+                currentAction = null;
+                return;
+            }
+
+            for (int i = 0; i < currentAction.Arguments.Count; i++)
+            {
+                var argumentChanged = ReplaceArgument(currentAction.Arguments[i], out var newArgument);
+
+                if (!argumentChanged)
+                    continue;
+                
+                if (newArgument == null)
+                    throw new InvalidOperationException(
+                        $"An argument could not be processed, no further action can take place");
+                
+                currentAction.Arguments[i] = newArgument;
+            }
+
+            if (currentAction.Arguments.Any(a => a.Type != ArgumentType.DefaultArgument))
+                return;
+
+            switch (currentAction.Type)
+            {
+                case ActionType.AddCardToToTile:
+                    break;
+                case ActionType.ChangeCardPrivacy:
+                    break;
+                case ActionType.ChangeTokenPrivacy:
+                    break;
+                case ActionType.DelayGame:
+                    break;
+                case ActionType.GivePlayerATokenTypeFromPlayer:
+                    break;
+                case ActionType.RemoveTokenTypeFromPlayer:
+                    break;
+                case ActionType.RemovePlayer:
+                    break;
+                case ActionType.MoveCardFromPlayerToTile:
+                    break;
+                case ActionType.MoveCardFromPlayerToTileInXPosition:
+                    break;
+                case ActionType.DelayTile:
+                    break;
+                case ActionType.ShuffleTile:
+                    break;
+                case ActionType.GivePlayerXCardsFromTileAction:
+                    break;
+                case ActionType.MoveXCardsFromPlayerToTile:
+                    break;
+                case ActionType.GiveXCardsAToken:
+                    break;
+                case ActionType.RemoveTokenTypeFromCard:
+                    break;
+                case ActionType.GivePlayerATokenType:
+                    break;
+                case ActionType.GiveCardFromPlayerToPlayer:
+                    break;
+                case ActionType.GivePlayerXTokensTypeAction:
+                    break;
+                case ActionType.StopTileEvents:
+                    break;
+                case ActionType.StopTileDelay:
+                    break;
+                case ActionType.MoveCardFromPlayerTileToTile:
+                    break;
+                case ActionType.PlayerWins:
+                    break;
+                case ActionType.PlayerStatesOfDefeat:
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException();
+            }
+
+            currentAction = null;
+        }
+
+        private bool InterpretConditional(ActionParameter action)
+        {
+            if (action == null)
+                throw new ArgumentNullException($"{nameof(action)}",
+                    $"A null action was passed to {nameof(InterpretConditional)}");
+            
+            var conditional = action.Conditional;
+
+            return InterpretConditional(conditional);
+        }
+
+        private bool InterpretConditional(ArgumentParameter conditional)
+        {
+            if (conditional == null)
+                return true;
+
+            if (conditional.Type.ReturnType() != ArgumentReturnType.Comparison)
+                throw new InvalidOperationException($"A conditional can only have a return type of {ArgumentReturnType.Comparison} (received {conditional.Type.ReturnType()}");
+
+            if (!ReplaceArgument(conditional, out var result) || result == null)
+                throw new InvalidOperationException(@$"The conditional of an Action contains user-dependant arguments, this is an error with {nameof(GameParser.Parse)}");
+
+            return result.Result[0] == 1;
+        }
+
+        /// <summary>
+        /// Reads an argument and tries to convert it to a version understandable by the executor, recursively with all it's inner arguments
+        /// </summary>
+        /// <param name="argument">the argument to read</param>
+        /// <param name="result"></param>
+        /// <exception cref="ArgumentOutOfRangeException"></exception>
+        /// <returns>True if result is different from argument, false otherwise</returns>
+        private bool ReplaceArgument(in ArgumentParameter argument, out ArgumentParameter result)
+        {
+            if (argument.Type == ArgumentType.DefaultArgument)
+            {
+                result = argument;
+                return false;
+            }
+
+            if (argument.Arguments.Count == 0)
+            {
+                switch (argument.Type)
+                {
+                    case ArgumentType.PrivacyType:
+                    case ArgumentType.NumberArgument:
+                    case ArgumentType.TokenType:
+                    case ArgumentType.CardType:
+                    case ArgumentType.TileType:
+                    case ArgumentType.DirectionType:
+                        
+                        result = new ArgumentParameter
+                        {
+                            Type = ArgumentType.DefaultArgument,
+                            Result = new List<int> { argument.Result[0] },
+                        };
+
+                        return true;
+                    
+                    default:
+                        result = null;
+                        return true;
+                }
+            }
+
+            bool replacedAtLeastOne = false;
+            
+            for (int i = 0; i < argument.Arguments.Count; i++)
+            {
+                bool replacedCurrent = ReplaceArgument(argument.Arguments[i], out var newArgument);
+                    
+                if (replacedCurrent && newArgument != null)
+                    argument.Arguments[i] = newArgument;
+
+                replacedAtLeastOne |= replacedCurrent;
+            }
+
+            if (!argument.Arguments.TrueForAll(a => a.Type == ArgumentType.DefaultArgument))
+            {
+                result = argument.Clone();
+                return replacedAtLeastOne;
+            }
+
+            switch (argument.Type)
+            {
+                case ArgumentType.CompareCardTypes:
+                {
+                    result = comparisionResult(currentCards[argument.Arguments[0].Result[0]].TypeID == argument.Arguments[1].Result[0]);
+                    return true;
+                }
+                
+                case ArgumentType.PlayerRightOfPlayerWithToken:
+                {
+                    result = new ArgumentParameter
+                    {
+                        Type = ArgumentType.DefaultArgument,
+                        Result = new List<int>
+                        {
+                            (argument.Arguments[0].Result[0] + 1) % JoinedPlayers,
+                        },
+                    }; 
+                    return true;
+                }
+                
+                case ArgumentType.PlayerWithToken:
+                {
+                    int tokenTypeID = argument.Arguments[0].Result[0];
+                    result = new ArgumentParameter
+                    {
+                        Type = ArgumentType.DefaultArgument,
+                        Result = new List<int>
+                        {
+                            Array.FindIndex(Players, p => p.Tile.Tokens.Any(t => t.TypeID == tokenTypeID)),
+                        },
+                    };
+                    return true;
+                }
+                
+                case ArgumentType.ComparePlayerWithTokenHasXTokens:
+                {
+                    int tokenType = argument.Arguments[2].Result[0];
+
+                    result = comparisionResult(
+                        Players[argument.Arguments[0].Result[0]].Tile.Tokens.First(t => t.TypeID == tokenType)
+                            .Count == argument.Arguments[1].Result[0]);
+                    return true;
+                }
+                
+                case ArgumentType.ComparePlayerWithTokenHasMoreThanXTokens:
+                {
+                    int tokenType = argument.Arguments[2].Result[0];
+
+                    result = comparisionResult(
+                        Players[argument.Arguments[0].Result[0]].Tile.Tokens.First(t => t.TypeID == tokenType)
+                            .Count > argument.Arguments[1].Result[0]);
+                    return true;
+                }
+                
+                case ArgumentType.ComparePlayerHasNoCardType:
+                {
+                    int cardType = argument.Arguments[1].Result[0];
+
+                    result = comparisionResult(
+                        Players[argument.Arguments[0].Result[0]].Tile.Cards.Any(c => c.TypeID != cardType));
+                    return true;
+                }
+                
+                case ArgumentType.ComparePlayerHasCardType:
+                {
+                    int cardType = argument.Arguments[1].Result[0];
+
+                    result = comparisionResult(
+                        Players[argument.Arguments[0].Result[0]].Tile.Cards.Any(c => c.TypeID == cardType));
+                    return true;
+                }
+                
+                case ArgumentType.ComparePlayerHasTokenType:
+                {
+                    int cardType = argument.Arguments[1].Result[0];
+
+                    result = comparisionResult(
+                        Players[argument.Arguments[0].Result[0]].Tile.Tokens.Any(c => c.TypeID == cardType));
+                    return true;
+                }
+                
+                case ArgumentType.FirstXCardsFromTile:
+                {
+                    result = new ArgumentParameter
+                    {
+                        Type = ArgumentType.DefaultArgument,
+                        Result = new List<int>(currentTiles[argument.Arguments[0].Result[0]].Cards
+                            .Take(argument.Arguments[0].Result[0]).Select(c => c.ID)),
+                    };
+                    
+                    return true;
+                }
+                
+                case ArgumentType.PlayerCardsWithToken:
+                {
+                    int tokenType = argument.Arguments[1].Result[0];
+                    var playerCards = Players[argument.Arguments[0].Result[0]].Tile.Cards.Where(c => c.Tokens.Any(t => t.TypeID == tokenType)).Select(c => c.ID);
+
+                    result = new ArgumentParameter
+                    {
+                        Type = ArgumentType.DefaultArgument,
+                        Result = playerCards.ToList(),
+                    };
+                    
+                    return true;
+                }
+                
+                case ArgumentType.TileWithNoCardsSelectedByPlayer:
+                case ArgumentType.PlayerChosenByPlayer:
+                {
+                    if (UserActionArgument != null)
+                    {
+                        if (UserActionArgument.Type != argument.Type)
+                            throw new InvalidOperationException($"{nameof(UserActionArgument)} was not null when an argument of type different to it was reached");
+
+                        if (UserActionArgument.Result[0] != -1)
+                        {
+                            result = new ArgumentParameter
+                            {
+                                Type = ArgumentType.DefaultArgument,
+                                Result = new List<int>
+                                {
+                                    UserActionArgument.Result[0],
+                                },
+                            };
+
+                            UserActionArgument = null;
+                            
+                            return true;
+                        }
+
+                        result = argument;
+
+                        return false;
+                    }
+
+                    UserActionArgument = argument.Clone();
+                    
+                    UserActionArgument.Result.Add(-1);
+
+                    result = UserActionArgument.Clone();
+
+                    return replacedAtLeastOne;
+                }
+                
+                case ArgumentType.CompareDirectionHasXTilesWithCards:
+                {
+                    var tile = currentTiles[argument.Arguments[2].Result[0]];
+                    int cardType = argument.Arguments[3].Result[0];
+                    int expectedToFind = argument.Arguments[0].Result[0];
+                    var tileArrangement = tile.Arrangement;
+                    var currentLookingArrangement = tile.Arrangement + Vector2.Zero;
+                    Tile currentLookingTile;
+                    var direction = (Direction)argument.Arguments[1].Result[0];
+                    var tileBoard = Boards.First(b => b.Tiles.Any(t => t.TypeID == tile.TypeID));
+
+                    if (tile.Cards.All(c => c.TypeID != cardType))
+                    {
+                        result = comparisionResult(false);
+                        return true;
+                    }
+
+                    int consecutiveFound = 1;
+                    
+                    MoveInDirection(false);
+
+                    while (consecutiveFound < expectedToFind &&
+                           (currentLookingTile = tileBoard[(int) currentLookingArrangement.X, (int) currentLookingArrangement.Y]) != null && currentLookingTile.Cards
+                               .Any(c => c.TypeID == cardType))
+                    {
+                        consecutiveFound++;
+                        MoveInDirection(false);
+                    }
+
+                    currentLookingArrangement = tileArrangement + Vector2.Zero;
+                    
+                    MoveInDirection(true);
+                    
+                    while (consecutiveFound < expectedToFind &&
+                           (currentLookingTile = tileBoard[(int) currentLookingArrangement.X, (int) currentLookingArrangement.Y]) != null && currentLookingTile.Cards
+                               .Any(c => c.TypeID == cardType))
+                    {
+                        consecutiveFound++;
+                        MoveInDirection(true);
+                    }
+
+                    result = comparisionResult(consecutiveFound == expectedToFind);
+                    
+                    return true;
+
+                    void MoveInDirection(bool invert)
+                    {
+                        switch (direction)
+                        {
+                            case Direction.Horizontal:
+                                if (invert)
+                                    currentLookingArrangement -= Vector2.UnitX;
+                                else
+                                    currentLookingArrangement += Vector2.UnitX;
+                                break;
+                            case Direction.Vertical:
+                                if (invert)
+                                    currentLookingArrangement -= Vector2.UnitY;
+                                else
+                                    currentLookingArrangement += Vector2.UnitY;
+                                break;
+                            case Direction.DiagonalTopLeft:
+                                if (invert)
+                                    currentLookingArrangement -= Vector2.One;
+                                else
+                                    currentLookingArrangement += Vector2.One;
+                                break;
+                            case Direction.DiagonalTopRight:
+                                if (invert)
+                                    currentLookingArrangement += new Vector2(1, -1);
+                                else
+                                    currentLookingArrangement += new Vector2(-1, 1);
+                                break;
+                            default:
+                                throw new ArgumentOutOfRangeException();
+                        }
+                    }
+                }
+                    
+                case ArgumentType.PlayerAtXPosition:
+                {
+                    result = new ArgumentParameter
+                    {
+                        Type = ArgumentType.DefaultArgument,
+                        Result = new List<int>
+                        {
+                            (argument.Arguments[0].Result[0] - 1) % JoinedPlayers,
+                        },
+                    };
+                    return true;
+                }
+
+                default:
+                    throw new ArgumentOutOfRangeException($"An argument of an unexpected type was passed to {nameof(PrepareAction)}");
+            }
+
+            ArgumentParameter comparisionResult(bool t) => new ArgumentParameter
+            {
+                Type = ArgumentType.DefaultArgument,
+                Result = new List<int>(1) { t ? 1 : 0 },
+            };
+        }
+
+        private void ExecutePreparationTurn()
+        {
+            actionQueue.EnqueueRange(blueprintPreparationTurn);
+
+            while (actionQueue.Count > 0 && currentAction != null)
+            {
+                Execute(false);
+            }
+        }
 
         public static explicit operator RoomPreview(Room r) => new RoomPreview(r);
     }

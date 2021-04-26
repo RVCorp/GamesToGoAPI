@@ -12,11 +12,12 @@ namespace GamesToGo.API.GameExecution
         
         public bool Ready { get; set; }
 
-        public Tile Tile { get; } = new Tile(-1);
+        public Tile Tile { get; }
 
         public Player(User user)
         {
             BackingUser = user;
+            Tile = new Tile(user.Id * -1);
         }
     }
 }

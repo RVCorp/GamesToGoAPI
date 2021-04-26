@@ -2,11 +2,10 @@
 {
     public enum EventType
     {
-        CardMovedToTile,
-        DrawCardOffTile,
-        DrawCardOfTypeOffTile,
-        ProjectEvent,
-        SetCardOnTile,
-        SetCardTypeOnTile,
+        SetCardOnTile = 1,
+        SetCardTypeOnTile = 2,
+        CardMovedToTile = 3,
+        DrawCardOfTypeOffTile = 4,
+        DrawCardOffTile = 5,
     }
 }
