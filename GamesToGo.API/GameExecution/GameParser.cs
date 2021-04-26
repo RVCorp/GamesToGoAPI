@@ -84,33 +84,43 @@ namespace GamesToGo.API.GameExecution
 
                     if (parameters == null)
                         return ParsingError.ParameterGroup;
+
+                    if (!TryParseValidateEnum<ElementType>($"{group.First()[0]}", out var elementType))
+                        return ParsingError.Object;
                     
-                    switch (Enum.Parse<ElementType>($"{group.First()[0]}"))
+                    switch (elementType)
                     {
                         case ElementType.Token:
                             Token newToken = ParseToken(id, parameters);
-                            if (newToken != null)
-                                Tokens.Add(newToken);
-                            else
+                            
+                            if (newToken == null)
                                 return ParsingError.Token;
+                            
+                            Tokens.Add(newToken);
                             break;
+                        
                         case ElementType.Card:
                             Card newCard = ParseCard(id, parameters);
-                            if (newCard != null)
-                                Cards.Add(newCard);
-                            else
+                            
+                            if (newCard == null)
                                 return ParsingError.Card;
+                            
+                            Cards.Add(newCard);
                             break;
+                        
                         case ElementType.Tile:
                             Tile newTile = ParseTile(id, parameters);
-                            if (newTile != null)
-                                pendingTiles.Add(newTile);
-                            else
+                            
+                            if (newTile == null)
                                 return ParsingError.Tile;
+                                
+                            pendingTiles.Add(newTile);
                             break;
+                        
                         case ElementType.Board:
                             pendingBoardGroups.Add((id, parameters));
                             break;
+                        
                         default:
                             return ParsingError.UnknownObject;
                     }
@@ -130,11 +140,11 @@ namespace GamesToGo.API.GameExecution
             foreach (var pendingBoard in pendingBoardGroups)
             {
                 var newBoard = ParseBoard(pendingBoard.id, pendingBoard.parameters, pendingTiles);
-                
-                if (newBoard != null)
-                    Boards.Add(newBoard);
-                else
+
+                if (newBoard == null)
                     return ParsingError.Board;
+                
+                Boards.Add(newBoard);
             }
 
             return ParsingError.Ok;
@@ -157,7 +167,9 @@ namespace GamesToGo.API.GameExecution
                 switch (section.Name)
                 {
                     case "Privacy":
-                        token.Privacy = Enum.Parse<Privacy>(section.Value);
+                        if (!TryParseValidateEnum(section.Value, out Privacy privacy))
+                            return null;
+                        token.Privacy = privacy;
                         break;
                 }
             }
@@ -172,13 +184,19 @@ namespace GamesToGo.API.GameExecution
                 switch (section.Name)
                 {
                     case "Privacy":
-                        card.Privacy = Enum.Parse<Privacy>(section.Value);
+                        if (!TryParseValidateEnum(section.Value, out Privacy privacy))
+                            return null;
+                        card.Privacy = privacy;
                         break;
                     case "Orient":
-                        card.Orientation = Enum.Parse<Orientation>(section.Value);
+                        if (!TryParseValidateEnum(section.Value, out Orientation orientation))
+                            return null;
+                        card.Orientation = orientation;
                         break;
                     case "Side":
-                        card.SideVisible = Enum.Parse<SideVisible>(section.Value);
+                        if (!TryParseValidateEnum(section.Value, out SideVisible sideVisible))
+                            return null;
+                        card.SideVisible = sideVisible;
                         break;
                     case "Events":
                         var possibleEvents = DivideEvents(section);
@@ -200,7 +218,9 @@ namespace GamesToGo.API.GameExecution
                 switch (section.Name)
                 {
                     case "Orient":
-                        tile.Orientation = Enum.Parse<Orientation>(section.Value);
+                        if (!TryParseValidateEnum(section.Value, out Orientation orientation))
+                            return null;
+                        tile.Orientation = orientation;
                         break;
                     case "Arrangement":
                     {
