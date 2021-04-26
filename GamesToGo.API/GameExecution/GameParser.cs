@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
@@ -263,6 +263,10 @@ namespace GamesToGo.API.GameExecution
                                 return null;
 
                             pendingTiles.Remove(possibleTile);
+
+                            if (board.Tiles.Any(t => t.Arrangement == possibleTile.Arrangement) &&
+                                board.Tiles.Any(t => t.Arrangement != Vector2.Zero))
+                                return null;
 
                             board.Tiles.Add(possibleTile);
                         }
