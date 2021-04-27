@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 
 namespace GamesToGo.API.GameExecution
 {
@@ -23,16 +23,6 @@ namespace GamesToGo.API.GameExecution
         public List<EventParameter> Events { get; } = new List<EventParameter>();
 
         public List<Token> Tokens { get; } = new List<Token>();
-
-        public void MoveFrom(Tile tile)
-        {
-            
-        }
-
-        public void MoveTo(Tile tile)
-        {
-            
-        }
 
         public Card CloneEmpty(int id)
         {
