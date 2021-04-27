@@ -318,51 +318,69 @@ namespace GamesToGo.API.GameExecution
             switch (currentAction.Type)
             {
                 case ActionType.AddCardToToTile:
+                {
                     break;
+                }
                 case ActionType.ChangeCardPrivacy:
+                {
                     break;
+                }
                 case ActionType.ChangeTokenPrivacy:
+                {
                     break;
-                case ActionType.DelayGame:
-                    break;
+                }
                 case ActionType.GivePlayerATokenTypeFromPlayer:
+                {
                     break;
+                }
                 case ActionType.RemoveTokenTypeFromPlayer:
+                {
                     break;
-                case ActionType.RemovePlayer:
-                    break;
+                }
                 case ActionType.MoveCardFromPlayerToTile:
+                {
                     break;
+                }
                 case ActionType.MoveCardFromPlayerToTileInXPosition:
+                {
                     break;
-                case ActionType.DelayTile:
-                    break;
+                }
                 case ActionType.ShuffleTile:
+                {
                     break;
+                }
                 case ActionType.GivePlayerXCardsFromTileAction:
+                {
                     break;
+                }
                 case ActionType.MoveXCardsFromPlayerToTile:
+                {
                     break;
+                }
                 case ActionType.GiveXCardsAToken:
+                {
                     break;
+                }
                 case ActionType.RemoveTokenTypeFromCard:
+                {
                     break;
+                }
                 case ActionType.GivePlayerATokenType:
+                {
                     break;
+                }
                 case ActionType.GiveCardFromPlayerToPlayer:
+                {
                     break;
+                }
                 case ActionType.GivePlayerXTokensTypeAction:
+                {
                     break;
-                case ActionType.StopTileEvents:
-                    break;
-                case ActionType.StopTileDelay:
-                    break;
+                }
                 case ActionType.MoveCardFromPlayerTileToTile:
+                {
                     break;
-                case ActionType.PlayerWins:
-                    break;
-                case ActionType.PlayerStatesOfDefeat:
-                    break;
+                }
                 default:
                     throw new ArgumentOutOfRangeException();
             }
