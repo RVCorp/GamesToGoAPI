@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -43,8 +43,8 @@ namespace GamesToGo.API.GameExecution
         public IReadOnlyList<Board> Boards { get; }
 
         private readonly Dictionary<int, Tile> currentTiles = new Dictionary<int, Tile>();
-
         private readonly Dictionary<int, Card> currentCards = new Dictionary<int, Card>();
+        private int latestCardID = 0;
 
         [JsonIgnore] private DateTime? timeStarted;
 
@@ -332,8 +332,13 @@ namespace GamesToGo.API.GameExecution
 
             switch (currentAction.Type)
             {
-                case ActionType.AddCardToToTile:
+                case ActionType.AddCardToTileChosenByPlayer:
+                case ActionType.AddCardToTile:
                 {
+                    var tile = currentTiles[currentAction.Arguments[1].Result[0]];
+                    var card = blueprintCards[currentAction.Arguments[0].Result[0]].CloneEmpty(++latestCardID);
+                    tile.Cards.Add(card);
+                    
                     break;
                 }
                 case ActionType.ChangeCardPrivacy:
@@ -382,6 +387,15 @@ namespace GamesToGo.API.GameExecution
                 }
                 case ActionType.GivePlayerATokenType:
                 {
+                    var playerTokens = Players[currentAction.Arguments[1].Result[0]].Tile.Tokens;
+                    var tokenType = blueprintTokens[currentAction.Arguments[0].Result[0]].Clone();
+                    if (playerTokens.Contains(tokenType))
+                        playerTokens.Find(t => t.Equals(tokenType))!.Count++;
+                    else
+                    {
+                        playerTokens.Add(tokenType);
+                        tokenType.Count++;
+                    }
                     break;
                 }
                 case ActionType.GiveCardFromPlayerToPlayer:
