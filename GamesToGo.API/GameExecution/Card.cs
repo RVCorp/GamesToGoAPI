@@ -1,4 +1,5 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
+using System.Linq;
 
 namespace GamesToGo.API.GameExecution
 {
@@ -32,6 +33,8 @@ namespace GamesToGo.API.GameExecution
                 Privacy = Privacy, 
                 SideVisible = SideVisible,
             };
+            
+            card.Events.AddRange(Events.Select(e => e.Clone()));
             return card;
         }
     }
