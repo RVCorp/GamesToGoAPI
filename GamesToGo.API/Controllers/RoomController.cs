@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Collections.Generic;
 using System.Linq;
@@ -86,6 +86,9 @@ namespace GamesToGo.API.Controllers
         {
             if (LoggedUser.Room == null)
                 return BadRequest();
+
+            if (LoggedUser.Room.HasStarted)
+                LoggedUser.Room.Execute();
 
             return LoggedUser.Room;
         }

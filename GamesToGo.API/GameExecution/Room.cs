@@ -214,7 +214,7 @@ namespace GamesToGo.API.GameExecution
 
         public ArgumentParameter UserActionArgument { get; set; }
 
-        private void Execute(bool activateEvents = true)
+        public void Execute(bool activateEvents = true)
         {
             lock(Lock)
             {
