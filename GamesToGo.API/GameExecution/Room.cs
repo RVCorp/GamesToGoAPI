@@ -17,8 +17,8 @@ namespace GamesToGo.API.GameExecution
 
         [JsonIgnore] public readonly object Lock = new object();
         
-        private readonly List<Token> blueprintTokens;
-        private readonly List<Card> blueprintCards;
+        private readonly Dictionary<int, Token> blueprintTokens;
+        private readonly Dictionary<int, Card> blueprintCards;
         private readonly CircularList<ActionParameter> blueprintTurns;
         private readonly List<ActionParameter> blueprintPreparationTurn;
         private readonly List<ActionParameter> blueprintVictoryConditions;
@@ -76,8 +76,8 @@ namespace GamesToGo.API.GameExecution
                 currentTiles.Add(tile.TypeID, tile);
             
             blueprintTurns = new CircularList<ActionParameter>(parser.Turns);
-            blueprintCards = parser.Cards;
-            blueprintTokens = parser.Tokens;
+            blueprintCards = new Dictionary<int, Card>(parser.Cards.Select(c => new KeyValuePair<int, Card>(c.TypeID, c)));
+            blueprintTokens = new Dictionary<int, Token>(parser.Tokens.Select(t => new KeyValuePair<int, Token>(t.TypeID, t)));
             blueprintPreparationTurn = parser.PreparationParameters;
             blueprintVictoryConditions = parser.VictoryConditions;
 
