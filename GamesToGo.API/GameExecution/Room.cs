@@ -208,6 +208,21 @@ namespace GamesToGo.API.GameExecution
             return true;
         }
 
+        public bool InteractUser(int idInteraction, User user)
+        {
+            lock (Lock)
+            {
+                int indexOfPlayer = Array.IndexOf(UserActionArgument.Type.InnerReturnTypes(),
+                    ArgumentReturnType.SinglePlayer);
+                if (Players[indexOfPlayer].BackingUser.Id != user.Id)
+                    return false;
+                
+                UserActionArgument.Result[0] = idInteraction;
+            }
+
+            return true;
+        }
+
         private readonly PriorityQueue<ActionParameter> actionQueue = new PriorityQueue<ActionParameter>();
 
         private ActionParameter currentAction;

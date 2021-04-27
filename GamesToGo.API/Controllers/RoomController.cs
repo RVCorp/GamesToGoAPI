@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Authorization;
+﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Collections.Generic;
 using System.Linq;
@@ -91,6 +91,15 @@ namespace GamesToGo.API.Controllers
                 LoggedUser.Room.Execute();
 
             return LoggedUser.Room;
+        }
+
+        [HttpPost("Interact")]
+        public ActionResult InteractWithRoom([FromForm] string resultID)
+        {
+            if (LoggedUser.Room == null)
+                return BadRequest();
+
+            return LoggedUser.Room.InteractUser(int.Parse(resultID), LoggedUser) ? Ok() : BadRequest();
         }
 
         public static Room GetRoom(int id)
