@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -216,59 +216,62 @@ namespace GamesToGo.API.GameExecution
 
         private void Execute(bool activateEvents = true)
         {
-            // An action was interrupted because we needed help from a user
-            // See if the user has interacted and continue if so
-            if (currentAction != null)
+            lock(Lock)
             {
-                PrepareAction(activateEvents);
-                 
-                // We still need some help from user
-                // Wait until next iteration
+                // An action was interrupted because we needed help from a user
+                // See if the user has interacted and continue if so
                 if (currentAction != null)
-                    return;
-            }
-
-            // First try to execute existing items in the queue
-            if (actionQueue.TryDequeue(out var actionToClone))
-            {
-                currentAction = actionToClone.Clone();
-                PrepareAction(activateEvents);
-            }
-            // If there are no items in queue, do something from the turns
-            else if (blueprintTurns.MoveNext())
-            {
-                currentAction = blueprintTurns.Current.Clone();
-                PrepareAction(activateEvents);
-            }
-            // ABORT! The turns are empty somehow???
-            // If we get to here, something went horribly wrong in GameParser.Parse()  !!
-            else if (blueprintTurns.Count == 0)
-            {
-                RoomController.LeaveRoom(Owner.BackingUser);
-            }
-            // DOUBLE ABORT!
-            // Somehow somewhere things wrecked themselved unimaginably
-            // Investigate if more logging is necessary to get to this point
-            else
-            {
-                throw new InvalidOperationException($"Room {ID} entered an invalid state");
-            }
-            
-            // To finish the cycle, get victory conditions and run all and every single one of them
-            if (blueprintVictoryConditions.Count == 0)
-                throw new InvalidOperationException($"Room {ID} was initialized without victory conditions");
-
-            foreach (var victoryCondition in blueprintVictoryConditions)
-            {
-                var usableVictoryCondition = victoryCondition.Clone();
-
-                var condition = usableVictoryCondition.Conditional ??
-                                usableVictoryCondition.Arguments.First(a =>
-                                    a.Type.ReturnType() == ArgumentReturnType.Comparison);
-
-                if (InterpretConditional(condition))
                 {
-                    //TODO: Get list of winning sons
+                    PrepareAction(activateEvents);
+
+                    // We still need some help from user
+                    // Wait until next iteration
+                    if (currentAction != null)
+                        return;
+                }
+
+                // First try to execute existing items in the queue
+                if (actionQueue.TryDequeue(out var actionToClone))
+                {
+                    currentAction = actionToClone.Clone();
+                    PrepareAction(activateEvents);
+                }
+                // If there are no items in queue, do something from the turns
+                else if (blueprintTurns.MoveNext())
+                {
+                    currentAction = blueprintTurns.Current.Clone();
+                    PrepareAction(activateEvents);
+                }
+                // ABORT! The turns are empty somehow???
+                // If we get to here, something went horribly wrong in GameParser.Parse()  !!
+                else if (blueprintTurns.Count == 0)
+                {
+                    RoomController.LeaveRoom(Owner.BackingUser);
+                }
+                // DOUBLE ABORT!
+                // Somehow somewhere things wrecked themselved unimaginably
+                // Investigate if more logging is necessary to get to this point
+                else
+                {
+                    throw new InvalidOperationException($"Room {ID} entered an invalid state");
+                }
+
+                // To finish the cycle, get victory conditions and run all and every single one of them
+                if (blueprintVictoryConditions.Count == 0)
+                    throw new InvalidOperationException($"Room {ID} was initialized without victory conditions");
+
+                foreach (var victoryCondition in blueprintVictoryConditions)
+                {
+                    var usableVictoryCondition = victoryCondition.Clone();
+
+                    var condition = usableVictoryCondition.Conditional ??
+                                    usableVictoryCondition.Arguments.First(a =>
+                                        a.Type.ReturnType() == ArgumentReturnType.Comparison);
+
+                    if (InterpretConditional(condition))
+                    {
+                        //TODO: Get list of winning sons
+                    }
                 }
             }
         }
