@@ -29,6 +29,7 @@ namespace GamesToGo.API
             Directory.CreateDirectory(filesPath);
             
             Environment.CurrentDirectory = filesPath;
+            Console.WriteLine(Environment.CurrentDirectory);
             var host = CreateHostBuilder(args).Build();
 
             if (args.Any(a => a == "--database"))
