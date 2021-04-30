@@ -7,7 +7,7 @@
             ArgumentReturnType.CardType,
             ArgumentReturnType.TileType,
         })]
-        AddCardToToTile = 1,
+        AddCardToTile = 1,
         
         [InnerReturnTypes(new []
         {
@@ -161,5 +161,11 @@
             ArgumentReturnType.Comparison,
         })]
         PlayerStatesOfDefeat = 24,
+        [InnerReturnTypes(new []
+        {
+            ArgumentReturnType.CardType,
+            ArgumentReturnType.SingleTile,
+        })]
+        AddCardToTileChosenByPlayer = 25,
     }
 }

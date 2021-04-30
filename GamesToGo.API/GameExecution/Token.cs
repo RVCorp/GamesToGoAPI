@@ -2,7 +2,7 @@
 
 namespace GamesToGo.API.GameExecution
 {
-    public class Token
+    public class Token : IEquatable<Token>
     {
         public int TypeID { get; }
 
@@ -38,9 +38,9 @@ namespace GamesToGo.API.GameExecution
             return obj is Token other && Equals(other);
         }
 
-        private bool Equals(Token other)
+        public bool Equals(Token other)
         {
-            return TypeID == other.TypeID;
+            return TypeID == other?.TypeID;
         }
 
         public override int GetHashCode()
