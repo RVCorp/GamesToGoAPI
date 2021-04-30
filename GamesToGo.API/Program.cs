@@ -17,30 +17,6 @@ namespace GamesToGo.API
     {
         public static void Main(string[] args)
         {
-            Console.WriteLine(JsonConvert.SerializeObject(new ArgumentParameter
-            {
-                Type = ArgumentType.PlayerCardsWithToken,
-                Arguments = new List<ArgumentParameter>
-                {
-                    new ArgumentParameter
-                    {
-                        Type = ArgumentType.DefaultArgument,
-                        Result = new List<int>
-                        {
-                            1,
-                        },
-                    },
-                    new ArgumentParameter
-                    {
-                        Type = ArgumentType.TokenType,
-                        Result = new List<int>()
-                        {
-                            5,
-                        },
-                    },
-                },
-            }, Formatting.Indented));
-            
             Console.WriteLine(Environment.CurrentDirectory);
             Console.WriteLine(System.Reflection.Assembly.GetExecutingAssembly().Location);
             Console.WriteLine(string.Join(' ', args));
