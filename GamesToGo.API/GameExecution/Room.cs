@@ -17,8 +17,8 @@ namespace GamesToGo.API.GameExecution
 
         [JsonIgnore] public readonly object Lock = new object();
         
-        private readonly List<Token> blueprintTokens;
-        private readonly List<Card> blueprintCards;
+        private readonly Dictionary<int, Token> blueprintTokens;
+        private readonly Dictionary<int, Card> blueprintCards;
         private readonly CircularList<ActionParameter> blueprintTurns;
         private readonly List<ActionParameter> blueprintPreparationTurn;
         private readonly List<ActionParameter> blueprintVictoryConditions;
@@ -43,8 +43,8 @@ namespace GamesToGo.API.GameExecution
         public IReadOnlyList<Board> Boards { get; }
 
         private readonly Dictionary<int, Tile> currentTiles = new Dictionary<int, Tile>();
-
         private readonly Dictionary<int, Card> currentCards = new Dictionary<int, Card>();
+        private int latestCardID = 0;
 
         [JsonIgnore] private DateTime? timeStarted;
 
@@ -76,8 +76,8 @@ namespace GamesToGo.API.GameExecution
                 currentTiles.Add(tile.TypeID, tile);
             
             blueprintTurns = new CircularList<ActionParameter>(parser.Turns);
-            blueprintCards = parser.Cards;
-            blueprintTokens = parser.Tokens;
+            blueprintCards = new Dictionary<int, Card>(parser.Cards.Select(c => new KeyValuePair<int, Card>(c.TypeID, c)));
+            blueprintTokens = new Dictionary<int, Token>(parser.Tokens.Select(t => new KeyValuePair<int, Token>(t.TypeID, t)));
             blueprintPreparationTurn = parser.PreparationParameters;
             blueprintVictoryConditions = parser.VictoryConditions;
 
@@ -208,67 +208,85 @@ namespace GamesToGo.API.GameExecution
             return true;
         }
 
+        public bool InteractUser(int idInteraction, User user)
+        {
+            lock (Lock)
+            {
+                int indexOfPlayer = Array.IndexOf(UserActionArgument.Type.InnerReturnTypes(),
+                    ArgumentReturnType.SinglePlayer);
+                if (Players[indexOfPlayer].BackingUser.Id != user.Id)
+                    return false;
+                
+                UserActionArgument.Result[0] = idInteraction;
+            }
+
+            return true;
+        }
+
         private readonly PriorityQueue<ActionParameter> actionQueue = new PriorityQueue<ActionParameter>();
 
         private ActionParameter currentAction;
 
         public ArgumentParameter UserActionArgument { get; set; }
 
-        private void Execute(bool activateEvents = true)
+        public void Execute(bool activateEvents = true)
         {
-            // An action was interrupted because we needed help from a user
-            // See if the user has interacted and continue if so
-            if (currentAction != null)
+            lock(Lock)
             {
-                PrepareAction(activateEvents);
-                 
-                // We still need some help from user
-                // Wait until next iteration
+                // An action was interrupted because we needed help from a user
+                // See if the user has interacted and continue if so
                 if (currentAction != null)
-                    return;
-            }
-
-            // First try to execute existing items in the queue
-            if (actionQueue.TryDequeue(out var actionToClone))
-            {
-                currentAction = actionToClone.Clone();
-                PrepareAction(activateEvents);
-            }
-            // If there are no items in queue, do something from the turns
-            else if (blueprintTurns.MoveNext())
-            {
-                currentAction = blueprintTurns.Current.Clone();
-                PrepareAction(activateEvents);
-            }
-            // ABORT! The turns are empty somehow???
-            // If we get to here, something went horribly wrong in GameParser.Parse()  !!
-            else if (blueprintTurns.Count == 0)
-            {
-                RoomController.LeaveRoom(Owner.BackingUser);
-            }
-            // DOUBLE ABORT!
-            // Somehow somewhere things wrecked themselved unimaginably
-            // Investigate if more logging is necessary to get to this point
-            else
-            {
-                throw new InvalidOperationException($"Room {ID} entered an invalid state");
-            }
-            
-            // To finish the cycle, get victory conditions and run all and every single one of them
-            if (blueprintVictoryConditions.Count == 0)
-                throw new InvalidOperationException($"Room {ID} was initialized without victory conditions");
-
-            foreach (var victoryCondition in blueprintVictoryConditions)
-            {
-                var usableVictoryCondition = victoryCondition.Clone();
-
-                var condition = usableVictoryCondition.Conditional ??
-                                usableVictoryCondition.Arguments.First(a =>
-                                    a.Type.ReturnType() == ArgumentReturnType.Comparison);
-
-                if (InterpretConditional(condition))
                 {
-                    //TODO: Get list of winning sons
+                    PrepareAction(activateEvents);
+
+                    // We still need some help from user
+                    // Wait until next iteration
+                    if (currentAction != null)
+                        return;
+                }
+
+                // First try to execute existing items in the queue
+                if (actionQueue.TryDequeue(out var actionToClone))
+                {
+                    currentAction = actionToClone.Clone();
+                    PrepareAction(activateEvents);
+                }
+                // If there are no items in queue, do something from the turns
+                else if (blueprintTurns.MoveNext())
+                {
+                    currentAction = blueprintTurns.Current.Clone();
+                    PrepareAction(activateEvents);
+                }
+                // ABORT! The turns are empty somehow???
+                // If we get to here, something went horribly wrong in GameParser.Parse()  !!
+                else if (blueprintTurns.Count == 0)
+                {
+                    RoomController.LeaveRoom(Owner.BackingUser);
+                }
+                // DOUBLE ABORT!
+                // Somehow somewhere things wrecked themselved unimaginably
+                // Investigate if more logging is necessary to get to this point
+                else
+                {
+                    throw new InvalidOperationException($"Room {ID} entered an invalid state");
+                }
+
+                // To finish the cycle, get victory conditions and run all and every single one of them
+                if (blueprintVictoryConditions.Count == 0)
+                    throw new InvalidOperationException($"Room {ID} was initialized without victory conditions");
+
+                foreach (var victoryCondition in blueprintVictoryConditions)
+                {
+                    var usableVictoryCondition = victoryCondition.Clone();
+
+                    var condition = usableVictoryCondition.Conditional ??
+                                    usableVictoryCondition.Arguments.First(a =>
+                                        a.Type.ReturnType() == ArgumentReturnType.Comparison);
+
+                    if (InterpretConditional(condition))
+                    {
+                        //TODO: Get list of winning sons
+                    }
                 }
             }
         }
@@ -314,52 +332,84 @@ namespace GamesToGo.API.GameExecution
 
             switch (currentAction.Type)
             {
-                case ActionType.AddCardToToTile:
+                case ActionType.AddCardToTileChosenByPlayer:
+                case ActionType.AddCardToTile:
+                {
+                    var tile = currentTiles[currentAction.Arguments[1].Result[0]];
+                    var card = blueprintCards[currentAction.Arguments[0].Result[0]].CloneEmpty(++latestCardID);
+                    tile.Cards.Add(card);
+                    
                     break;
+                }
                 case ActionType.ChangeCardPrivacy:
+                {
                     break;
+                }
                 case ActionType.ChangeTokenPrivacy:
+                {
                     break;
-                case ActionType.DelayGame:
-                    break;
+                }
                 case ActionType.GivePlayerATokenTypeFromPlayer:
+                {
                     break;
+                }
                 case ActionType.RemoveTokenTypeFromPlayer:
+                {
                     break;
-                case ActionType.RemovePlayer:
-                    break;
+                }
                 case ActionType.MoveCardFromPlayerToTile:
+                {
                     break;
+                }
                 case ActionType.MoveCardFromPlayerToTileInXPosition:
+                {
                     break;
-                case ActionType.DelayTile:
-                    break;
+                }
                 case ActionType.ShuffleTile:
+                {
                     break;
+                }
                 case ActionType.GivePlayerXCardsFromTileAction:
+                {
                     break;
+                }
                 case ActionType.MoveXCardsFromPlayerToTile:
+                {
                     break;
+                }
                 case ActionType.GiveXCardsAToken:
+                {
                     break;
+                }
                 case ActionType.RemoveTokenTypeFromCard:
+                {
                     break;
+                }
                 case ActionType.GivePlayerATokenType:
+                {
+                    var playerTokens = Players[currentAction.Arguments[1].Result[0]].Tile.Tokens;
+                    var tokenType = blueprintTokens[currentAction.Arguments[0].Result[0]].Clone();
+                    if (playerTokens.Contains(tokenType))
+                        playerTokens.Find(t => t.Equals(tokenType))!.Count++;
+                    else
+                    {
+                        playerTokens.Add(tokenType);
+                        tokenType.Count++;
+                    }
                     break;
+                }
                 case ActionType.GiveCardFromPlayerToPlayer:
+                {
                     break;
+                }
                 case ActionType.GivePlayerXTokensTypeAction:
+                {
                     break;
-                case ActionType.StopTileEvents:
-                    break;
-                case ActionType.StopTileDelay:
-                    break;
+                }
                 case ActionType.MoveCardFromPlayerTileToTile:
+                {
                     break;
-                case ActionType.PlayerWins:
-                    break;
-                case ActionType.PlayerStatesOfDefeat:
-                    break;
+                }
                 default:
                     throw new ArgumentOutOfRangeException();
             }

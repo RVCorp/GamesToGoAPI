@@ -14,7 +14,7 @@ namespace GamesToGo.API.GameExecution
         
         public List<Token> Tokens { get; } = new List<Token>();
         
-        public IReadOnlyList<Card> Cards { get; } = new List<Card>();
+        public List<Card> Cards { get; } = new List<Card>();
 
         public List<EventParameter> Events { get; } = new List<EventParameter>();
         

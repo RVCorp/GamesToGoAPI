@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Linq;
 
 namespace GamesToGo.API.GameExecution
 {
@@ -24,16 +25,6 @@ namespace GamesToGo.API.GameExecution
 
         public List<Token> Tokens { get; } = new List<Token>();
 
-        public void MoveFrom(Tile tile)
-        {
-            
-        }
-
-        public void MoveTo(Tile tile)
-        {
-            
-        }
-
         public Card CloneEmpty(int id)
         {
             var card = new Card(TypeID, id)
@@ -42,6 +33,8 @@ namespace GamesToGo.API.GameExecution
                 Privacy = Privacy, 
                 SideVisible = SideVisible,
             };
+            
+            card.Events.AddRange(Events.Select(e => e.Clone()));
             return card;
         }
     }
