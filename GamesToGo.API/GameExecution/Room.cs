@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
@@ -62,6 +62,10 @@ namespace GamesToGo.API.GameExecution
             .Select(token => new KeyValuePair<int, Token>(token.ID, token)));
 
         private int latestTokenID;
+
+        [JsonIgnore]
+        private readonly Random roomRNG = new Random();
+
 
         [JsonIgnore]
         private DateTime? timeStarted;
@@ -384,30 +388,87 @@ namespace GamesToGo.API.GameExecution
                 }
                 case ActionType.ChangeCardPrivacy:
                 {
-                    break;
-                }
-                case ActionType.ChangeTokenPrivacy:
-                {
+                    var card = CurrentCards[currentAction.Arguments[0].Result[0]];
+                    card.Privacy = (Privacy) currentAction.Arguments[1].Result[0];
                     break;
                 }
                 case ActionType.GivePlayerATokenTypeFromPlayer:
                 {
+                    var originPlayerTokens = Players[currentAction.Arguments[2].Result[0]].Tile.TokenDictionary;
+                    var destinationPlayerTokens = Players[currentAction.Arguments[1].Result[0]].Tile.TokenDictionary;
+                    var tokenType = blueprintTokens[currentAction.Arguments[0].Result[0]].Clone();
+
+                    originPlayerTokens[tokenType.TypeID]--;
+                    if (originPlayerTokens[tokenType.TypeID].Count == 0)
+                        originPlayerTokens.Remove(tokenType.TypeID);
+                    
+                    if (destinationPlayerTokens.ContainsKey(tokenType.TypeID))
+                    {
+                        destinationPlayerTokens[tokenType.TypeID]++;
+                    }
+                    else
+                    {
+                        destinationPlayerTokens.Add(tokenType.TypeID, tokenType);
+                        tokenType.ID = ++latestTokenID;
+                        tokenType.Count++;
+                    }
+                    
                     break;
                 }
                 case ActionType.RemoveTokenTypeFromPlayer:
                 {
+                    var playerTokens = Players[currentAction.Arguments[1].Result[0]].Tile
+                        .TokenDictionary;
+
+                    int tokenTypeID = currentAction.Arguments[0].Result[0];
+                    playerTokens[tokenTypeID]--;
+
+                    if (playerTokens[tokenTypeID].Count == 0)
+                        playerTokens.Remove(tokenTypeID);
+                        
                     break;
                 }
                 case ActionType.MoveCardFromPlayerToTile:
                 {
+                    int cardTypeID = currentAction.Arguments[0].Result[0];
+                    var originTile = Players[currentAction.Arguments[1].Result[0]].Tile;
+
+                    var cardToMove = originTile.Cards.First(c => c.TypeID == cardTypeID);
+
+                    originTile.Cards.Remove(cardToMove);
+                    
+                    CurrentTiles[currentAction.Arguments[2].Result[0]].Cards.Add(cardToMove);
+                    
                     break;
                 }
                 case ActionType.MoveCardFromPlayerToTileInXPosition:
                 {
+                    int cardTypeID = currentAction.Arguments[0].Result[0];
+                    var originTile = Players[currentAction.Arguments[1].Result[0]].Tile;
+
+                    var cardToMove = originTile.Cards.First(c => c.TypeID == cardTypeID);
+
+                    originTile.Cards.Remove(cardToMove);
+
+                    int insertIndex = currentAction.Arguments[3].Result[0];
+                    CurrentTiles[currentAction.Arguments[1].Result[0]].Cards.Insert(insertIndex, cardToMove);
+                    
                     break;
                 }
                 case ActionType.ShuffleTile:
                 {
+                    var tile = CurrentTiles[currentAction.Arguments[0].Result[0]];
+                    
+                    int n = tile.Cards.Count;
+                    while (n > 1)
+                    {
+                        n--;
+                        int k = roomRNG.Next(n + 1);
+                        var value = tile.Cards[k];
+                        tile.Cards[k] = tile.Cards[n];
+                        tile.Cards[n] = value;
+                    }
+                    
                     break;
                 }
                 case ActionType.GivePlayerXCardsFromTileAction:
@@ -416,6 +477,7 @@ namespace GamesToGo.API.GameExecution
                 }
                 case ActionType.MoveXCardsFromPlayerToTile:
                 {
+                    
                     break;
                 }
                 case ActionType.GiveXCardsAToken:
