@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
@@ -323,17 +323,25 @@ namespace GamesToGo.API.GameExecution
                 if (blueprintVictoryConditions.Count == 0)
                     BailExecution(new InvalidOperationException($"Room {ID} was initialized without victory conditions"));
 
-                foreach (var victoryCondition in blueprintVictoryConditions)
+                if (currentAction == null)
                 {
-                    var usableVictoryCondition = victoryCondition.Clone();
-
-                    var condition = usableVictoryCondition.Conditional ??
-                                    usableVictoryCondition.Arguments.First(a =>
-                                        a.Type.ReturnType() == ArgumentReturnType.Comparison);
-
-                    if (InterpretConditional(condition))
+                    List<int> winners = new List<int>();
+                    
+                    foreach (var victoryCondition in blueprintVictoryConditions)
                     {
-                        //TODO: Get list of winning sons
+                        if (victoryCondition.Type != ActionType.PlayerWins)
+                            BailExecution(new InvalidOperationException($"Attempted to win a game via an argument which does not denote victory {victoryCondition.Type}"));
+                        
+                        var usableVictoryCondition = victoryCondition.Clone();
+
+                        var condition = usableVictoryCondition.Conditional ??
+                                        usableVictoryCondition.Arguments.First(a =>
+                                            a.Type.ReturnType() == ArgumentReturnType.Comparison);
+
+                        if (InterpretConditional(condition))
+                        {
+                            //TODO: Get list of winning sons
+                        }
                     }
                 }
             }
