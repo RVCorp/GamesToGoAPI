@@ -547,7 +547,6 @@ namespace GamesToGo.API.GameExecution
             var argument = new ArgumentParameter
             {
                 Type = argumentType,
-                Result = null,
                 Arguments = arguments,
             };
             
