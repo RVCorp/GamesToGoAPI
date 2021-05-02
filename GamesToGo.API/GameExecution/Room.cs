@@ -1,10 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
 using System.Numerics;
 using System.Threading.Tasks;
-using GamesToGo.API.Controllers;
 using GamesToGo.API.Extensions;
 using GamesToGo.API.Models;
 using Newtonsoft.Json;
@@ -86,6 +86,8 @@ namespace GamesToGo.API.GameExecution
         [JsonIgnore]
         private DateTime? timeEnded;
 
+        public bool HasEnded => timeEnded.HasValue;
+
         [JsonIgnore]
         private List<int> winningPlayersIndexes;
 
@@ -94,9 +96,21 @@ namespace GamesToGo.API.GameExecution
             get => winningPlayersIndexes;
             set
             {
+                if (HasEnded || value == null)
+                    return;
                 timeEnded = DateTime.Now;
 
                 winningPlayersIndexes = value;
+            }
+        }
+
+        public bool Errored
+        {
+            get => HasEnded && winningPlayersIndexes == null;
+            private set
+            {
+                if (value)
+                    timeEnded = DateTime.Now;
             }
         }
 
@@ -198,16 +212,16 @@ namespace GamesToGo.API.GameExecution
                     Players[i] = null;
                     user.Room = null;
 
-                    if (Owner.BackingUser.Id == user.Id)
+                    if (Owner.BackingUser.Id != user.Id || HasEnded)
+                        return true;
+                    
+                    for (int j = 0; j < Players.Length; j++)
                     {
-                        for (int j = 0; j < Players.Length; j++)
-                        {
-                            if (Players[j] == null)
-                                continue;
+                        if (Players[j] == null)
+                            continue;
 
-                            Players[j].BackingUser.Room = null;
-                            Players[j] = null;
-                        }
+                        Players[j].BackingUser.Room = null;
+                        Players[j] = null;
                     }
 
                     return true;
@@ -245,8 +259,10 @@ namespace GamesToGo.API.GameExecution
         {
             lock (Lock)
             {
-                int indexOfPlayer = Array.IndexOf(UserActionArgument.Type.InnerReturnTypes(),
-                    ArgumentReturnType.SinglePlayer);
+                if (HasEnded)
+                    return false;
+                int indexOfPlayer = UserActionArgument.Arguments[Array.IndexOf(UserActionArgument.Type.InnerReturnTypes(),
+                    ArgumentReturnType.SinglePlayer)].Result[0];
                 if (Players[indexOfPlayer].BackingUser.Id != user.Id)
                     return false;
                 
@@ -266,6 +282,8 @@ namespace GamesToGo.API.GameExecution
         {
             lock(Lock)
             {
+                if (HasEnded)
+                    return;
                 // An action was interrupted because we needed help from a user
                 // See if the user has interacted and continue if so
                 if (currentAction != null)
@@ -292,21 +310,14 @@ namespace GamesToGo.API.GameExecution
                 }
                 // ABORT! The turns are empty somehow???
                 // If we get to here, something went horribly wrong in GameParser.Parse()  !!
-                else if (blueprintTurns.Count == 0)
-                {
-                    RoomController.LeaveRoom(Owner.BackingUser);
-                }
-                // DOUBLE ABORT!
-                // Somehow somewhere things wrecked themselved unimaginably
-                // Investigate if more logging is necessary to get to this point
                 else
                 {
-                    throw new InvalidOperationException($"Room {ID} entered an invalid state");
+                    BailExecution(new InvalidOperationException($"Room {ID} entered an invalid state"));
                 }
 
                 // To finish the cycle, get victory conditions and run all and every single one of them
                 if (blueprintVictoryConditions.Count == 0)
-                    throw new InvalidOperationException($"Room {ID} was initialized without victory conditions");
+                    BailExecution(new InvalidOperationException($"Room {ID} was initialized without victory conditions"));
 
                 foreach (var victoryCondition in blueprintVictoryConditions)
                 {
@@ -331,14 +342,11 @@ namespace GamesToGo.API.GameExecution
         /// Will try to excecute with current state of arguments, if successful then will set <see cref="currentAction"/> to null
         /// If not successful, will populate <see cref="UserActionArgument"/> with the argument the client needs to solve to continue 
         /// </summary>
-        /// <remarks>
-        /// If no action is set, an exception might be thrown.
-        /// </remarks>
         /// <exception cref="NullReferenceException">Thrown if <see cref="currentAction"/> is null</exception>
         private void PrepareAction(bool activateEvents)
         {
             if (currentAction == null)
-                throw new NullReferenceException($"{nameof(currentAction)} was found to be null, game cannot continue");
+                BailExecution(new NullReferenceException($"{nameof(currentAction)} was found to be null, game cannot continue"));
 
             if (!InterpretConditional(currentAction))
             {
@@ -354,8 +362,8 @@ namespace GamesToGo.API.GameExecution
                     continue;
                 
                 if (newArgument == null)
-                    throw new InvalidOperationException(
-                        $"An argument could not be processed, no further action can take place");
+                    BailExecution(new InvalidOperationException(
+                        $"An argument could not be processed, no further action can take place"));
                 
                 currentAction.Arguments[i] = newArgument;
             }
@@ -368,7 +376,7 @@ namespace GamesToGo.API.GameExecution
                 case ActionType.AddCardToTileChosenByPlayer:
                 case ActionType.AddCardToTile:
                 {
-                    var tile = currentTiles[currentAction.Arguments[1].Result[0]];
+                    var tile = CurrentTiles[currentAction.Arguments[1].Result[0]];
                     var card = blueprintCards[currentAction.Arguments[0].Result[0]].CloneEmpty(++latestCardID);
                     tile.Cards.Add(card);
                     
@@ -414,7 +422,7 @@ namespace GamesToGo.API.GameExecution
                 {
                     break;
                 }
-                case ActionType.RemoveTokenTypeFromCard:
+                case ActionType.RemoveTokenTypeFromCards:
                 {
                     break;
                 }
@@ -446,7 +454,10 @@ namespace GamesToGo.API.GameExecution
                     break;
                 }
                 default:
-                    throw new ArgumentOutOfRangeException();
+                {
+                    BailExecution(new ArgumentOutOfRangeException($"A not executable ActionType was parsed ({currentAction.Type})"));
+                    break;
+                }
             }
 
             currentAction = null;
@@ -455,24 +466,24 @@ namespace GamesToGo.API.GameExecution
         private bool InterpretConditional(ActionParameter action)
         {
             if (action == null)
-                throw new ArgumentNullException($"{nameof(action)}",
-                    $"A null action was passed to {nameof(InterpretConditional)}");
+                BailExecution(new ArgumentNullException($"{nameof(action)}",
+                    $"A null action was passed to {nameof(InterpretConditional)}"));
             
             var conditional = action.Conditional;
 
             return InterpretConditional(conditional);
         }
-
+        
         private bool InterpretConditional(ArgumentParameter conditional)
         {
             if (conditional == null)
                 return true;
 
             if (conditional.Type.ReturnType() != ArgumentReturnType.Comparison)
-                throw new InvalidOperationException($"A conditional can only have a return type of {ArgumentReturnType.Comparison} (received {conditional.Type.ReturnType()}");
+                BailExecution(new InvalidOperationException($"A conditional can only have a return type of {ArgumentReturnType.Comparison} (received {conditional.Type.ReturnType()}"));
 
-            if (!ReplaceArgument(conditional, out var result) || result == null)
-                throw new InvalidOperationException(@$"The conditional of an Action contains user-dependant arguments, this is an error with {nameof(GameParser.Parse)}");
+            if (!ReplaceArgument(conditional, out var result) || result == null || result.Type != ArgumentType.DefaultArgument)
+                BailExecution(new InvalidOperationException(@$"The conditional of an Action contains user-dependant arguments, this is an error with {nameof(GameParser.Parse)}"));
 
             return result.Result[0] == 1;
         }
@@ -649,7 +660,7 @@ namespace GamesToGo.API.GameExecution
                     if (UserActionArgument != null)
                     {
                         if (UserActionArgument.Type != argument.Type)
-                            throw new InvalidOperationException($"{nameof(UserActionArgument)} was not null when an argument of type different to it was reached");
+                            BailExecution(new InvalidOperationException($"{nameof(UserActionArgument)} was not null when an argument of type different to it was reached"));
 
                         if (UserActionArgument.Result[0] != -1)
                         {
@@ -755,7 +766,10 @@ namespace GamesToGo.API.GameExecution
                                     currentLookingArrangement += new Vector2(-1, 1);
                                 break;
                             default:
-                                throw new ArgumentOutOfRangeException();
+                            {
+                                BailExecution(new ArgumentOutOfRangeException($"A lookup was requested in an impossible direction ({direction})"));
+                                break;
+                            }
                         }
                     }
                 }
@@ -774,7 +788,12 @@ namespace GamesToGo.API.GameExecution
                 }
 
                 default:
-                    throw new ArgumentOutOfRangeException($"An argument of an unexpected type was passed to {nameof(PrepareAction)}");
+                {
+                    BailExecution(new ArgumentOutOfRangeException(
+                        $"An argument of an unexpected type was passed to {nameof(PrepareAction)}"));
+                    result = null;
+                    return true;
+                }
             }
 
             ArgumentParameter comparisionResult(bool t) => new ArgumentParameter
@@ -786,12 +805,26 @@ namespace GamesToGo.API.GameExecution
 
         private void ExecutePreparationTurn()
         {
-            actionQueue.EnqueueRange(blueprintPreparationTurn);
-
-            while (actionQueue.Count > 0 && currentAction != null)
+            lock (Lock)
             {
-                Execute(false);
+                actionQueue.EnqueueRange(blueprintPreparationTurn);
+
+                while (actionQueue.Count > 0 && !Errored)
+                {
+                    Execute(false);
+                    if (currentAction != null)
+                        BailExecution(new InvalidOperationException(
+                            @$"The conditional of an Action in the preparation turn contains user-dependant arguments, this is an error with {nameof(GameParser.Parse)}"));
+                }
             }
+        }
+
+        [DoesNotReturn]
+        private void BailExecution(Exception e)
+        {
+            UserActionArgument = null;
+            Errored = true;
+            throw e;
         }
 
         public static explicit operator RoomPreview(Room r) => new RoomPreview(r);
