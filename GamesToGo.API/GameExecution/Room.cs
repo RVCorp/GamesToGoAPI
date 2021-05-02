@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
@@ -567,27 +567,19 @@ namespace GamesToGo.API.GameExecution
 
             if (argument.Arguments.Count == 0)
             {
-                switch (argument.Type)
+                if (argument.Type.ShouldHaveResult())
                 {
-                    case ArgumentType.PrivacyType:
-                    case ArgumentType.NumberArgument:
-                    case ArgumentType.TokenType:
-                    case ArgumentType.CardType:
-                    case ArgumentType.TileType:
-                    case ArgumentType.DirectionType:
-                        
-                        result = new ArgumentParameter
-                        {
-                            Type = ArgumentType.DefaultArgument,
-                            Result = new List<int> { argument.Result[0] },
-                        };
+                    result = new ArgumentParameter
+                    {
+                        Type = ArgumentType.DefaultArgument,
+                        Result = new List<int> { argument.Result[0] },
+                    };
 
-                        return true;
-                    
-                    default:
-                        result = null;
-                        return true;
+                    return true;
                 }
+                
+                result = null;
+                return true;
             }
 
             bool replacedAtLeastOne = false;
