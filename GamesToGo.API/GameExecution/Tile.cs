@@ -1,5 +1,7 @@
 ﻿using System.Collections.Generic;
+using System.Linq;
 using System.Numerics;
+using Newtonsoft.Json;
 
 namespace GamesToGo.API.GameExecution
 {
@@ -11,8 +13,11 @@ namespace GamesToGo.API.GameExecution
         }
 
         public int TypeID { get; }
-        
-        public List<Token> Tokens { get; } = new List<Token>();
+
+        public IReadOnlyList<Token> Tokens => TokenDictionary.Values.ToList();
+
+        [JsonIgnore]
+        public readonly Dictionary<int, Token> TokenDictionary = new Dictionary<int, Token>();
         
         public List<Card> Cards { get; } = new List<Card>();
 

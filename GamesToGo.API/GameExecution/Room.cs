@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -15,8 +15,9 @@ namespace GamesToGo.API.GameExecution
     {
         private static int latestCreatedRoom;
 
-        [JsonIgnore] public readonly object Lock = new object();
-        
+        [JsonIgnore]
+        public readonly object Lock = new object();
+
         private readonly Dictionary<int, Token> blueprintTokens;
         private readonly Dictionary<int, Card> blueprintCards;
         private readonly CircularList<ActionParameter> blueprintTurns;
@@ -42,11 +43,28 @@ namespace GamesToGo.API.GameExecution
 
         public IReadOnlyList<Board> Boards { get; }
 
-        private readonly Dictionary<int, Tile> currentTiles = new Dictionary<int, Tile>();
-        private readonly Dictionary<int, Card> currentCards = new Dictionary<int, Card>();
-        private int latestCardID = 0;
+        private IReadOnlyDictionary<int, Tile> CurrentTiles => new Dictionary<int, Tile>(Boards
+            .SelectMany(b => b.Tiles)
+            .Select(t => new KeyValuePair<int, Tile>(t.TypeID, t)));
 
-        [JsonIgnore] private DateTime? timeStarted;
+        private IReadOnlyDictionary<int, Card> CurrentCards => new Dictionary<int, Card>(CurrentTiles.Values
+            .SelectMany(t => t.Cards)
+            .Concat(Players.SelectMany(p => p.Tile.Cards))
+            .Select(c => new KeyValuePair<int, Card>(c.ID, c)));
+
+        private int latestCardID;
+
+        private IReadOnlyDictionary<int, Token> CurrentTokens => new Dictionary<int, Token>(CurrentCards.Values
+            .SelectMany(c => c.Tokens)
+            .Concat(CurrentTiles.Values
+                .Concat(Players.Select(p => p.Tile))
+                .SelectMany(tile => tile.Tokens))
+            .Select(token => new KeyValuePair<int, Token>(token.ID, token)));
+
+        private int latestTokenID;
+
+        [JsonIgnore]
+        private DateTime? timeStarted;
 
         public bool HasStarted
         {
@@ -71,9 +89,6 @@ namespace GamesToGo.API.GameExecution
             Game = game;
             
             Boards = parser.Boards;
-
-            foreach (var tile in parser.Boards.SelectMany(board => board.Tiles))
-                currentTiles.Add(tile.TypeID, tile);
             
             blueprintTurns = new CircularList<ActionParameter>(parser.Turns);
             blueprintCards = new Dictionary<int, Card>(parser.Cards.Select(c => new KeyValuePair<int, Card>(c.TypeID, c)));
@@ -387,13 +402,15 @@ namespace GamesToGo.API.GameExecution
                 }
                 case ActionType.GivePlayerATokenType:
                 {
-                    var playerTokens = Players[currentAction.Arguments[1].Result[0]].Tile.Tokens;
+                    var playerTokens = Players[currentAction.Arguments[1].Result[0]].Tile.TokenDictionary;
                     var tokenType = blueprintTokens[currentAction.Arguments[0].Result[0]].Clone();
-                    if (playerTokens.Contains(tokenType))
-                        playerTokens.Find(t => t.Equals(tokenType))!.Count++;
+                    
+                    if (playerTokens.ContainsKey(tokenType.TypeID))
+                        playerTokens[tokenType.TypeID]++;
                     else
                     {
-                        playerTokens.Add(tokenType);
+                        playerTokens.Add(tokenType.TypeID, tokenType);
+                        tokenType.ID = ++latestTokenID;
                         tokenType.Count++;
                     }
                     break;
@@ -504,7 +521,7 @@ namespace GamesToGo.API.GameExecution
             {
                 case ArgumentType.CompareCardTypes:
                 {
-                    result = comparisionResult(currentCards[argument.Arguments[0].Result[0]].TypeID == argument.Arguments[1].Result[0]);
+                    result = comparisionResult(CurrentCards[argument.Arguments[0].Result[0]].TypeID == argument.Arguments[1].Result[0]);
                     return true;
                 }
                 
@@ -587,7 +604,7 @@ namespace GamesToGo.API.GameExecution
                     result = new ArgumentParameter
                     {
                         Type = ArgumentType.DefaultArgument,
-                        Result = new List<int>(currentTiles[argument.Arguments[0].Result[0]].Cards
+                        Result = new List<int>(CurrentTiles[argument.Arguments[0].Result[0]].Cards
                             .Take(argument.Arguments[0].Result[0]).Select(c => c.ID)),
                     };
                     
@@ -648,7 +665,7 @@ namespace GamesToGo.API.GameExecution
                 
                 case ArgumentType.CompareDirectionHasXTilesWithCards:
                 {
-                    var tile = currentTiles[argument.Arguments[2].Result[0]];
+                    var tile = CurrentTiles[argument.Arguments[2].Result[0]];
                     int cardType = argument.Arguments[3].Result[0];
                     int expectedToFind = argument.Arguments[0].Result[0];
                     var tileArrangement = tile.Arrangement;

@@ -23,8 +23,10 @@ namespace GamesToGo.API.GameExecution
 
         public List<EventParameter> Events { get; } = new List<EventParameter>();
 
-        public List<Token> Tokens { get; } = new List<Token>();
+        public List<Token> Tokens => TokenDictionary.Values.ToList();
 
+        public readonly Dictionary<int, Token> TokenDictionary = new Dictionary<int, Token>();
+        
         public Card CloneEmpty(int id)
         {
             var card = new Card(TypeID, id)
