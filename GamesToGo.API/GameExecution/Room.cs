@@ -73,14 +73,32 @@ namespace GamesToGo.API.GameExecution
             {
                 if (!value || HasStarted)
                     return;
-                
+
                 ExecutePreparationTurn();
-                
+
                 timeStarted = DateTime.Now;
             }
         }
+    
 
-        public double TimeElapsed => timeStarted == null ? 0 : (DateTime.Now - timeStarted).Value.TotalMilliseconds;
+        public double TimeElapsed => timeStarted == null ? 0 : (timeEnded - timeStarted)?.TotalMilliseconds ?? (DateTime.Now - timeStarted).Value.TotalMilliseconds;
+
+        [JsonIgnore]
+        private DateTime? timeEnded;
+
+        [JsonIgnore]
+        private List<int> winningPlayersIndexes;
+
+        public List<int> WinningPlayersIndexes
+        {
+            get => winningPlayersIndexes;
+            set
+            {
+                timeEnded = DateTime.Now;
+
+                winningPlayersIndexes = value;
+            }
+        }
 
         private Room(User user, Game game, GameParser parser)
         {
