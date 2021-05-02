@@ -109,7 +109,7 @@
             ArgumentReturnType.TokenType,
             ArgumentReturnType.MultipleCard,
         })]
-        RemoveTokenTypeFromCard = 15,
+        RemoveTokenTypeFromCards = 15,
         
         [InnerReturnTypes(new []
         {
