@@ -161,11 +161,19 @@
             ArgumentReturnType.Comparison,
         })]
         PlayerStatesOfDefeat = 24,
+        
         [InnerReturnTypes(new []
         {
             ArgumentReturnType.CardType,
             ArgumentReturnType.SingleTile,
         })]
         AddCardToTileChosenByPlayer = 25,
+        
+        [InnerReturnTypes(new []
+        {
+            ArgumentReturnType.MultiplePlayer,
+            ArgumentReturnType.Comparison,
+        })]
+        PlayersWins = 26,
     }
 }
