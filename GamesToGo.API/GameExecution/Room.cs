@@ -1,10 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
 using System.Numerics;
 using System.Threading.Tasks;
-using GamesToGo.API.Controllers;
 using GamesToGo.API.Extensions;
 using GamesToGo.API.Models;
 using Newtonsoft.Json;
@@ -15,8 +15,9 @@ namespace GamesToGo.API.GameExecution
     {
         private static int latestCreatedRoom;
 
-        [JsonIgnore] public readonly object Lock = new object();
-        
+        [JsonIgnore]
+        public readonly object Lock = new object();
+
         private readonly Dictionary<int, Token> blueprintTokens;
         private readonly Dictionary<int, Card> blueprintCards;
         private readonly CircularList<ActionParameter> blueprintTurns;
@@ -42,11 +43,32 @@ namespace GamesToGo.API.GameExecution
 
         public IReadOnlyList<Board> Boards { get; }
 
-        private readonly Dictionary<int, Tile> currentTiles = new Dictionary<int, Tile>();
-        private readonly Dictionary<int, Card> currentCards = new Dictionary<int, Card>();
-        private int latestCardID = 0;
+        private IReadOnlyDictionary<int, Tile> CurrentTiles => new Dictionary<int, Tile>(Boards
+            .SelectMany(b => b.Tiles)
+            .Select(t => new KeyValuePair<int, Tile>(t.TypeID, t)));
 
-        [JsonIgnore] private DateTime? timeStarted;
+        private IReadOnlyDictionary<int, Card> CurrentCards => new Dictionary<int, Card>(CurrentTiles.Values
+            .SelectMany(t => t.Cards)
+            .Concat(Players.SelectMany(p => p.Tile.Cards))
+            .Select(c => new KeyValuePair<int, Card>(c.ID, c)));
+
+        private int latestCardID;
+
+        private IReadOnlyDictionary<int, Token> CurrentTokens => new Dictionary<int, Token>(CurrentCards.Values
+            .SelectMany(c => c.Tokens)
+            .Concat(CurrentTiles.Values
+                .Concat(Players.Select(p => p.Tile))
+                .SelectMany(tile => tile.Tokens))
+            .Select(token => new KeyValuePair<int, Token>(token.ID, token)));
+
+        private int latestTokenID;
+
+        [JsonIgnore]
+        private readonly Random roomRNG = new Random();
+
+
+        [JsonIgnore]
+        private DateTime? timeStarted;
 
         public bool HasStarted
         {
@@ -55,14 +77,46 @@ namespace GamesToGo.API.GameExecution
             {
                 if (!value || HasStarted)
                     return;
-                
+
                 ExecutePreparationTurn();
-                
+
                 timeStarted = DateTime.Now;
             }
         }
+    
 
-        public double TimeElapsed => timeStarted == null ? 0 : (DateTime.Now - timeStarted).Value.TotalMilliseconds;
+        public double TimeElapsed => timeStarted == null ? 0 : (timeEnded - timeStarted)?.TotalMilliseconds ?? (DateTime.Now - timeStarted).Value.TotalMilliseconds;
+
+        [JsonIgnore]
+        private DateTime? timeEnded;
+
+        public bool HasEnded => timeEnded.HasValue;
+
+        [JsonIgnore]
+        private List<int> winningPlayersIndexes;
+
+        public List<int> WinningPlayersIndexes
+        {
+            get => winningPlayersIndexes;
+            set
+            {
+                if (HasEnded || value == null)
+                    return;
+                timeEnded = DateTime.Now;
+
+                winningPlayersIndexes = value;
+            }
+        }
+
+        public bool Errored
+        {
+            get => HasEnded && winningPlayersIndexes == null;
+            private set
+            {
+                if (value)
+                    timeEnded = DateTime.Now;
+            }
+        }
 
         private Room(User user, Game game, GameParser parser)
         {
@@ -71,9 +125,6 @@ namespace GamesToGo.API.GameExecution
             Game = game;
             
             Boards = parser.Boards;
-
-            foreach (var tile in parser.Boards.SelectMany(board => board.Tiles))
-                currentTiles.Add(tile.TypeID, tile);
             
             blueprintTurns = new CircularList<ActionParameter>(parser.Turns);
             blueprintCards = new Dictionary<int, Card>(parser.Cards.Select(c => new KeyValuePair<int, Card>(c.TypeID, c)));
@@ -165,16 +216,16 @@ namespace GamesToGo.API.GameExecution
                     Players[i] = null;
                     user.Room = null;
 
-                    if (Owner.BackingUser.Id == user.Id)
+                    if (Owner.BackingUser.Id != user.Id || HasEnded)
+                        return true;
+                    
+                    for (int j = 0; j < Players.Length; j++)
                     {
-                        for (int j = 0; j < Players.Length; j++)
-                        {
-                            if (Players[j] == null)
-                                continue;
+                        if (Players[j] == null)
+                            continue;
 
-                            Players[j].BackingUser.Room = null;
-                            Players[j] = null;
-                        }
+                        Players[j].BackingUser.Room = null;
+                        Players[j] = null;
                     }
 
                     return true;
@@ -212,8 +263,10 @@ namespace GamesToGo.API.GameExecution
         {
             lock (Lock)
             {
-                int indexOfPlayer = Array.IndexOf(UserActionArgument.Type.InnerReturnTypes(),
-                    ArgumentReturnType.SinglePlayer);
+                if (HasEnded)
+                    return false;
+                int indexOfPlayer = UserActionArgument.Arguments[Array.IndexOf(UserActionArgument.Type.InnerReturnTypes(),
+                    ArgumentReturnType.SinglePlayer)].Result[0];
                 if (Players[indexOfPlayer].BackingUser.Id != user.Id)
                     return false;
                 
@@ -233,6 +286,8 @@ namespace GamesToGo.API.GameExecution
         {
             lock(Lock)
             {
+                if (HasEnded)
+                    return;
                 // An action was interrupted because we needed help from a user
                 // See if the user has interacted and continue if so
                 if (currentAction != null)
@@ -242,6 +297,9 @@ namespace GamesToGo.API.GameExecution
                     // We still need some help from user
                     // Wait until next iteration
                     if (currentAction != null)
+                        return;
+
+                    if (ApplyWinningConditions())
                         return;
                 }
 
@@ -259,36 +317,50 @@ namespace GamesToGo.API.GameExecution
                 }
                 // ABORT! The turns are empty somehow???
                 // If we get to here, something went horribly wrong in GameParser.Parse()  !!
-                else if (blueprintTurns.Count == 0)
-                {
-                    RoomController.LeaveRoom(Owner.BackingUser);
-                }
-                // DOUBLE ABORT!
-                // Somehow somewhere things wrecked themselved unimaginably
-                // Investigate if more logging is necessary to get to this point
                 else
                 {
-                    throw new InvalidOperationException($"Room {ID} entered an invalid state");
+                    BailExecution(new InvalidOperationException($"Room {ID} entered an invalid state"));
                 }
 
-                // To finish the cycle, get victory conditions and run all and every single one of them
-                if (blueprintVictoryConditions.Count == 0)
-                    throw new InvalidOperationException($"Room {ID} was initialized without victory conditions");
+                ApplyWinningConditions();
+            }
+        }
 
+        /// <summary>
+        /// Computes victory conditions and applies them to their respective users.
+        /// If any are applied ends the game and assigns <see cref="WinningPlayersIndexes"/>.
+        /// </summary>
+        /// <returns>True if the game ended due to one or more condition returning winning players, false otherwise.</returns>
+        private bool ApplyWinningConditions()
+        {
+            // To finish the cycle, get victory conditions and run all and every single one of them
+            if (blueprintVictoryConditions.Count == 0)
+                BailExecution(new InvalidOperationException($"Room {ID} was initialized without victory conditions"));
+
+            if (currentAction == null)
+            {
+                List<int> winners = new List<int>();
+                    
                 foreach (var victoryCondition in blueprintVictoryConditions)
                 {
+                    if (!(victoryCondition.Type == ActionType.PlayerWins ^ victoryCondition.Type == ActionType.PlayersWins ))
+                        BailExecution(new InvalidOperationException($"Attempted to win a game via an argument which does not denote victory {victoryCondition.Type}"));
+                        
                     var usableVictoryCondition = victoryCondition.Clone();
 
                     var condition = usableVictoryCondition.Conditional ??
                                     usableVictoryCondition.Arguments.First(a =>
                                         a.Type.ReturnType() == ArgumentReturnType.Comparison);
 
-                    if (InterpretConditional(condition))
-                    {
-                        //TODO: Get list of winning sons
-                    }
+                    if (InterpretConditional(condition) && ReplaceArgument(usableVictoryCondition.Arguments[0], out var result) && result != null && result.Result.Count > 0)
+                        winners.AddRange(result.Result);
                 }
+                    
+                if (winners.Count > 0)
+                    WinningPlayersIndexes = winners;
             }
+
+            return HasEnded;
         }
 
         /// <summary>
@@ -298,14 +370,11 @@ namespace GamesToGo.API.GameExecution
         /// Will try to excecute with current state of arguments, if successful then will set <see cref="currentAction"/> to null
         /// If not successful, will populate <see cref="UserActionArgument"/> with the argument the client needs to solve to continue 
         /// </summary>
-        /// <remarks>
-        /// If no action is set, an exception might be thrown.
-        /// </remarks>
         /// <exception cref="NullReferenceException">Thrown if <see cref="currentAction"/> is null</exception>
         private void PrepareAction(bool activateEvents)
         {
             if (currentAction == null)
-                throw new NullReferenceException($"{nameof(currentAction)} was found to be null, game cannot continue");
+                BailExecution(new NullReferenceException($"{nameof(currentAction)} was found to be null, game cannot continue"));
 
             if (!InterpretConditional(currentAction))
             {
@@ -321,8 +390,8 @@ namespace GamesToGo.API.GameExecution
                     continue;
                 
                 if (newArgument == null)
-                    throw new InvalidOperationException(
-                        $"An argument could not be processed, no further action can take place");
+                    BailExecution(new InvalidOperationException(
+                        $"An argument could not be processed, no further action can take place"));
                 
                 currentAction.Arguments[i] = newArgument;
             }
@@ -335,7 +404,7 @@ namespace GamesToGo.API.GameExecution
                 case ActionType.AddCardToTileChosenByPlayer:
                 case ActionType.AddCardToTile:
                 {
-                    var tile = currentTiles[currentAction.Arguments[1].Result[0]];
+                    var tile = CurrentTiles[currentAction.Arguments[1].Result[0]];
                     var card = blueprintCards[currentAction.Arguments[0].Result[0]].CloneEmpty(++latestCardID);
                     tile.Cards.Add(card);
                     
@@ -343,30 +412,87 @@ namespace GamesToGo.API.GameExecution
                 }
                 case ActionType.ChangeCardPrivacy:
                 {
-                    break;
-                }
-                case ActionType.ChangeTokenPrivacy:
-                {
+                    var card = CurrentCards[currentAction.Arguments[0].Result[0]];
+                    card.Privacy = (Privacy) currentAction.Arguments[1].Result[0];
                     break;
                 }
                 case ActionType.GivePlayerATokenTypeFromPlayer:
                 {
+                    var originPlayerTokens = Players[currentAction.Arguments[2].Result[0]].Tile.TokenDictionary;
+                    var destinationPlayerTokens = Players[currentAction.Arguments[1].Result[0]].Tile.TokenDictionary;
+                    var tokenType = blueprintTokens[currentAction.Arguments[0].Result[0]].Clone();
+
+                    originPlayerTokens[tokenType.TypeID]--;
+                    if (originPlayerTokens[tokenType.TypeID].Count == 0)
+                        originPlayerTokens.Remove(tokenType.TypeID);
+                    
+                    if (destinationPlayerTokens.ContainsKey(tokenType.TypeID))
+                    {
+                        destinationPlayerTokens[tokenType.TypeID]++;
+                    }
+                    else
+                    {
+                        destinationPlayerTokens.Add(tokenType.TypeID, tokenType);
+                        tokenType.ID = ++latestTokenID;
+                        tokenType.Count++;
+                    }
+                    
                     break;
                 }
                 case ActionType.RemoveTokenTypeFromPlayer:
                 {
+                    var playerTokens = Players[currentAction.Arguments[1].Result[0]].Tile
+                        .TokenDictionary;
+
+                    int tokenTypeID = currentAction.Arguments[0].Result[0];
+                    playerTokens[tokenTypeID]--;
+
+                    if (playerTokens[tokenTypeID].Count == 0)
+                        playerTokens.Remove(tokenTypeID);
+                        
                     break;
                 }
                 case ActionType.MoveCardFromPlayerToTile:
                 {
+                    int cardTypeID = currentAction.Arguments[0].Result[0];
+                    var originTile = Players[currentAction.Arguments[1].Result[0]].Tile;
+
+                    var cardToMove = originTile.Cards.First(c => c.TypeID == cardTypeID);
+
+                    originTile.Cards.Remove(cardToMove);
+                    
+                    CurrentTiles[currentAction.Arguments[2].Result[0]].Cards.Add(cardToMove);
+                    
                     break;
                 }
                 case ActionType.MoveCardFromPlayerToTileInXPosition:
                 {
+                    int cardTypeID = currentAction.Arguments[0].Result[0];
+                    var originTile = Players[currentAction.Arguments[1].Result[0]].Tile;
+
+                    var cardToMove = originTile.Cards.First(c => c.TypeID == cardTypeID);
+
+                    originTile.Cards.Remove(cardToMove);
+
+                    int insertIndex = currentAction.Arguments[3].Result[0];
+                    CurrentTiles[currentAction.Arguments[1].Result[0]].Cards.Insert(insertIndex, cardToMove);
+                    
                     break;
                 }
                 case ActionType.ShuffleTile:
                 {
+                    var tile = CurrentTiles[currentAction.Arguments[0].Result[0]];
+                    
+                    int n = tile.Cards.Count;
+                    while (n > 1)
+                    {
+                        n--;
+                        int k = roomRNG.Next(n + 1);
+                        var value = tile.Cards[k];
+                        tile.Cards[k] = tile.Cards[n];
+                        tile.Cards[n] = value;
+                    }
+                    
                     break;
                 }
                 case ActionType.GivePlayerXCardsFromTileAction:
@@ -375,25 +501,28 @@ namespace GamesToGo.API.GameExecution
                 }
                 case ActionType.MoveXCardsFromPlayerToTile:
                 {
+                    
                     break;
                 }
                 case ActionType.GiveXCardsAToken:
                 {
                     break;
                 }
-                case ActionType.RemoveTokenTypeFromCard:
+                case ActionType.RemoveTokenTypeFromCards:
                 {
                     break;
                 }
                 case ActionType.GivePlayerATokenType:
                 {
-                    var playerTokens = Players[currentAction.Arguments[1].Result[0]].Tile.Tokens;
+                    var playerTokens = Players[currentAction.Arguments[1].Result[0]].Tile.TokenDictionary;
                     var tokenType = blueprintTokens[currentAction.Arguments[0].Result[0]].Clone();
-                    if (playerTokens.Contains(tokenType))
-                        playerTokens.Find(t => t.Equals(tokenType))!.Count++;
+                    
+                    if (playerTokens.ContainsKey(tokenType.TypeID))
+                        playerTokens[tokenType.TypeID]++;
                     else
                     {
-                        playerTokens.Add(tokenType);
+                        playerTokens.Add(tokenType.TypeID, tokenType);
+                        tokenType.ID = ++latestTokenID;
                         tokenType.Count++;
                     }
                     break;
@@ -411,7 +540,10 @@ namespace GamesToGo.API.GameExecution
                     break;
                 }
                 default:
-                    throw new ArgumentOutOfRangeException();
+                {
+                    BailExecution(new ArgumentOutOfRangeException($"A not executable ActionType was parsed ({currentAction.Type})"));
+                    break;
+                }
             }
 
             currentAction = null;
@@ -420,24 +552,24 @@ namespace GamesToGo.API.GameExecution
         private bool InterpretConditional(ActionParameter action)
         {
             if (action == null)
-                throw new ArgumentNullException($"{nameof(action)}",
-                    $"A null action was passed to {nameof(InterpretConditional)}");
+                BailExecution(new ArgumentNullException($"{nameof(action)}",
+                    $"A null action was passed to {nameof(InterpretConditional)}"));
             
             var conditional = action.Conditional;
 
             return InterpretConditional(conditional);
         }
-
+        
         private bool InterpretConditional(ArgumentParameter conditional)
         {
             if (conditional == null)
                 return true;
 
             if (conditional.Type.ReturnType() != ArgumentReturnType.Comparison)
-                throw new InvalidOperationException($"A conditional can only have a return type of {ArgumentReturnType.Comparison} (received {conditional.Type.ReturnType()}");
+                BailExecution(new InvalidOperationException($"A conditional can only have a return type of {ArgumentReturnType.Comparison} (received {conditional.Type.ReturnType()}"));
 
-            if (!ReplaceArgument(conditional, out var result) || result == null)
-                throw new InvalidOperationException(@$"The conditional of an Action contains user-dependant arguments, this is an error with {nameof(GameParser.Parse)}");
+            if (!ReplaceArgument(conditional, out var result) || result == null || result.Type != ArgumentType.DefaultArgument)
+                BailExecution(new InvalidOperationException(@$"The conditional of an Action contains user-dependant arguments, this is an error with {nameof(GameParser.Parse)}"));
 
             return result.Result[0] == 1;
         }
@@ -459,27 +591,19 @@ namespace GamesToGo.API.GameExecution
 
             if (argument.Arguments.Count == 0)
             {
-                switch (argument.Type)
+                if (argument.Type.ShouldHaveResult())
                 {
-                    case ArgumentType.PrivacyType:
-                    case ArgumentType.NumberArgument:
-                    case ArgumentType.TokenType:
-                    case ArgumentType.CardType:
-                    case ArgumentType.TileType:
-                    case ArgumentType.DirectionType:
-                        
-                        result = new ArgumentParameter
-                        {
-                            Type = ArgumentType.DefaultArgument,
-                            Result = new List<int> { argument.Result[0] },
-                        };
+                    result = new ArgumentParameter
+                    {
+                        Type = ArgumentType.DefaultArgument,
+                        Result = new List<int> { argument.Result[0] },
+                    };
 
-                        return true;
-                    
-                    default:
-                        result = null;
-                        return true;
+                    return true;
                 }
+                
+                result = null;
+                return true;
             }
 
             bool replacedAtLeastOne = false;
@@ -504,7 +628,7 @@ namespace GamesToGo.API.GameExecution
             {
                 case ArgumentType.CompareCardTypes:
                 {
-                    result = comparisionResult(currentCards[argument.Arguments[0].Result[0]].TypeID == argument.Arguments[1].Result[0]);
+                    result = comparisionResult(CurrentCards[argument.Arguments[0].Result[0]].TypeID == argument.Arguments[1].Result[0]);
                     return true;
                 }
                 
@@ -587,7 +711,7 @@ namespace GamesToGo.API.GameExecution
                     result = new ArgumentParameter
                     {
                         Type = ArgumentType.DefaultArgument,
-                        Result = new List<int>(currentTiles[argument.Arguments[0].Result[0]].Cards
+                        Result = new List<int>(CurrentTiles[argument.Arguments[0].Result[0]].Cards
                             .Take(argument.Arguments[0].Result[0]).Select(c => c.ID)),
                     };
                     
@@ -608,47 +732,9 @@ namespace GamesToGo.API.GameExecution
                     return true;
                 }
                 
-                case ArgumentType.TileWithNoCardsSelectedByPlayer:
-                case ArgumentType.PlayerChosenByPlayer:
-                {
-                    if (UserActionArgument != null)
-                    {
-                        if (UserActionArgument.Type != argument.Type)
-                            throw new InvalidOperationException($"{nameof(UserActionArgument)} was not null when an argument of type different to it was reached");
-
-                        if (UserActionArgument.Result[0] != -1)
-                        {
-                            result = new ArgumentParameter
-                            {
-                                Type = ArgumentType.DefaultArgument,
-                                Result = new List<int>
-                                {
-                                    UserActionArgument.Result[0],
-                                },
-                            };
-
-                            UserActionArgument = null;
-                            
-                            return true;
-                        }
-
-                        result = argument;
-
-                        return false;
-                    }
-
-                    UserActionArgument = argument.Clone();
-                    
-                    UserActionArgument.Result.Add(-1);
-
-                    result = UserActionArgument.Clone();
-
-                    return replacedAtLeastOne;
-                }
-                
                 case ArgumentType.CompareDirectionHasXTilesWithCards:
                 {
-                    var tile = currentTiles[argument.Arguments[2].Result[0]];
+                    var tile = CurrentTiles[argument.Arguments[2].Result[0]];
                     int cardType = argument.Arguments[3].Result[0];
                     int expectedToFind = argument.Arguments[0].Result[0];
                     var tileArrangement = tile.Arrangement;
@@ -720,7 +806,10 @@ namespace GamesToGo.API.GameExecution
                                     currentLookingArrangement += new Vector2(-1, 1);
                                 break;
                             default:
-                                throw new ArgumentOutOfRangeException();
+                            {
+                                BailExecution(new ArgumentOutOfRangeException($"A lookup was requested in an impossible direction ({direction})"));
+                                break;
+                            }
                         }
                     }
                 }
@@ -737,9 +826,66 @@ namespace GamesToGo.API.GameExecution
                     };
                     return true;
                 }
+                
+                // Arguments that need the user
+                
+                case ArgumentType.TileWithNoCardsSelectedByPlayer:
+                case ArgumentType.PlayerChosenByPlayer:
+                {
+                    if (UserActionArgument != null)
+                    {
+                        if (UserActionArgument.Type != argument.Type)
+                            BailExecution(new InvalidOperationException($"{nameof(UserActionArgument)} was not null when an argument of type different to it was reached"));
+
+                        if (UserActionArgument.Result[0] != -1)
+                        {
+                            result = new ArgumentParameter
+                            {
+                                Type = ArgumentType.DefaultArgument,
+                                Result = new List<int>
+                                {
+                                    UserActionArgument.Result[0],
+                                },
+                            };
+
+                            UserActionArgument = null;
+                            
+                            return true;
+                        }
+
+                        result = argument;
+
+                        return false;
+                    }
+
+                    switch (argument.Type)
+                    {
+                        case ArgumentType.TileWithNoCardsSelectedByPlayer:
+                        {
+                            if (CurrentTiles.Values.Any(t => t.Cards.Count == 0))
+                                break;
+                            WinningPlayersIndexes = new List<int>();
+                            result = null;
+                            return true;
+                        }
+                    }
+
+                    UserActionArgument = argument.Clone();
+                    
+                    UserActionArgument.Result.Add(-1);
+
+                    result = UserActionArgument.Clone();
+
+                    return replacedAtLeastOne;
+                }
 
                 default:
-                    throw new ArgumentOutOfRangeException($"An argument of an unexpected type was passed to {nameof(PrepareAction)}");
+                {
+                    BailExecution(new ArgumentOutOfRangeException(
+                        $"An argument of an unexpected type was passed to {nameof(PrepareAction)}"));
+                    result = null;
+                    return true;
+                }
             }
 
             ArgumentParameter comparisionResult(bool t) => new ArgumentParameter
@@ -751,12 +897,26 @@ namespace GamesToGo.API.GameExecution
 
         private void ExecutePreparationTurn()
         {
-            actionQueue.EnqueueRange(blueprintPreparationTurn);
-
-            while (actionQueue.Count > 0 && currentAction != null)
+            lock (Lock)
             {
-                Execute(false);
+                actionQueue.EnqueueRange(blueprintPreparationTurn);
+
+                while (actionQueue.Count > 0 && !Errored)
+                {
+                    Execute(false);
+                    if (currentAction != null)
+                        BailExecution(new InvalidOperationException(
+                            @$"The conditional of an Action in the preparation turn contains user-dependant arguments, this is an error with {nameof(GameParser.Parse)}"));
+                }
             }
+        }
+
+        [DoesNotReturn]
+        private void BailExecution(Exception e)
+        {
+            UserActionArgument = null;
+            Errored = true;
+            throw e;
         }
 
         public static explicit operator RoomPreview(Room r) => new RoomPreview(r);

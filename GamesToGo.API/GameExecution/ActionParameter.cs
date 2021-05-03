@@ -17,7 +17,7 @@ namespace GamesToGo.API.GameExecution
             {
                 Type = Type,
                 Arguments = Arguments.Select(arg => arg.Clone()).ToList(),
-                Conditional = Conditional.Clone(),
+                Conditional = Conditional?.Clone(),
             };
         }
     }

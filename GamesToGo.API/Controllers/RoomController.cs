@@ -82,13 +82,27 @@ namespace GamesToGo.API.Controllers
         }
 
         [HttpGet("RoomState")]
-        public ActionResult<Room> JoinedRoomState()
+        public ActionResult<Room> RoomState()
         {
             if (LoggedUser.Room == null)
                 return BadRequest();
 
-            if (LoggedUser.Room.HasStarted)
+            if (!LoggedUser.Room.HasStarted)
+                return LoggedUser.Room;
+            
+            UsersController.ClearInvitationsFor(LoggedUser);
+
+            if (LoggedUser.Room.HasEnded)
+                return LoggedUser.Room;
+            
+            try
+            {
                 LoggedUser.Room.Execute();
+            }
+            catch
+            {
+                // ignored
+            }
 
             return LoggedUser.Room;
         }
@@ -96,9 +110,9 @@ namespace GamesToGo.API.Controllers
         [HttpPost("Interact")]
         public ActionResult InteractWithRoom([FromForm] string resultID)
         {
-            if (LoggedUser.Room == null)
+            if (LoggedUser.Room == null || LoggedUser.Room.HasEnded)
                 return BadRequest();
-
+            
             return LoggedUser.Room.InteractUser(int.Parse(resultID), LoggedUser) ? Ok() : BadRequest();
         }
 

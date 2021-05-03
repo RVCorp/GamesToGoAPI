@@ -109,7 +109,7 @@
             ArgumentReturnType.TokenType,
             ArgumentReturnType.MultipleCard,
         })]
-        RemoveTokenTypeFromCard = 15,
+        RemoveTokenTypeFromCards = 15,
         
         [InnerReturnTypes(new []
         {
@@ -161,11 +161,19 @@
             ArgumentReturnType.Comparison,
         })]
         PlayerStatesOfDefeat = 24,
+        
         [InnerReturnTypes(new []
         {
             ArgumentReturnType.CardType,
             ArgumentReturnType.SingleTile,
         })]
         AddCardToTileChosenByPlayer = 25,
+        
+        [InnerReturnTypes(new []
+        {
+            ArgumentReturnType.MultiplePlayer,
+            ArgumentReturnType.Comparison,
+        })]
+        PlayersWins = 26,
     }
 }
