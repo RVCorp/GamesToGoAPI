@@ -539,6 +539,15 @@ namespace GamesToGo.API.GameExecution
                 {
                     break;
                 }
+                case ActionType.AddCardTypeToFirstFreeTileInTileChosenByPlayer:
+                {
+                    float tileColumn = CurrentTiles[currentAction.Arguments[1].Result[0]].Arrangement.X;
+                    var tile = CurrentTiles.Values.Where(t => t.Arrangement.X == tileColumn).OrderBy(t => t.Arrangement.X).First();
+                    var card = blueprintCards[currentAction.Arguments[0].Result[0]].CloneEmpty(++latestCardID);
+                    
+                    tile.Cards.Add(card);
+                    break;
+                }
                 default:
                 {
                     BailExecution(new ArgumentOutOfRangeException($"A not executable ActionType was parsed ({currentAction.Type})"));
@@ -830,6 +839,8 @@ namespace GamesToGo.API.GameExecution
                 // Arguments that need the user
                 
                 case ArgumentType.TileWithNoCardsSelectedByPlayer:
+                case ArgumentType.TileSelectedByPlayer:
+                case ArgumentType.CardSelectedByPlayer:
                 case ArgumentType.PlayerChosenByPlayer:
                 {
                     if (UserActionArgument != null)

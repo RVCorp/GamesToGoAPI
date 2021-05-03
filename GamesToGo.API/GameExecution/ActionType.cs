@@ -175,5 +175,12 @@
             ArgumentReturnType.Comparison,
         })]
         PlayersWins = 26,
+        
+        [InnerReturnTypes(new []
+        {
+            ArgumentReturnType.CardType,
+            ArgumentReturnType.SingleTile,
+        })]
+        AddCardTypeToFirstFreeTileInTileChosenByPlayer = 27,
     }
 }
