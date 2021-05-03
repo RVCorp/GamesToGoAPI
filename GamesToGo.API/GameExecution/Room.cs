@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
@@ -298,6 +298,9 @@ namespace GamesToGo.API.GameExecution
                     // Wait until next iteration
                     if (currentAction != null)
                         return;
+
+                    if (ApplyWinningConditions())
+                        return;
                 }
 
                 // First try to execute existing items in the queue
@@ -319,32 +322,45 @@ namespace GamesToGo.API.GameExecution
                     BailExecution(new InvalidOperationException($"Room {ID} entered an invalid state"));
                 }
 
-                // To finish the cycle, get victory conditions and run all and every single one of them
-                if (blueprintVictoryConditions.Count == 0)
-                    BailExecution(new InvalidOperationException($"Room {ID} was initialized without victory conditions"));
-
-                if (currentAction == null)
-                {
-                    List<int> winners = new List<int>();
-                    
-                    foreach (var victoryCondition in blueprintVictoryConditions)
-                    {
-                        if (victoryCondition.Type != ActionType.PlayerWins)
-                            BailExecution(new InvalidOperationException($"Attempted to win a game via an argument which does not denote victory {victoryCondition.Type}"));
-                        
-                        var usableVictoryCondition = victoryCondition.Clone();
-
-                        var condition = usableVictoryCondition.Conditional ??
-                                        usableVictoryCondition.Arguments.First(a =>
-                                            a.Type.ReturnType() == ArgumentReturnType.Comparison);
-
-                        if (InterpretConditional(condition))
-                        {
-                            //TODO: Get list of winning sons
-                        }
-                    }
-                }
+                ApplyWinningConditions();
             }
+        }
+
+        /// <summary>
+        /// Computes victory conditions and applies them to their respective users.
+        /// If any are applied ends the game and assigns <see cref="WinningPlayersIndexes"/>.
+        /// </summary>
+        /// <returns>True if the game ended due to one or more condition returning winning players, false otherwise.</returns>
+        private bool ApplyWinningConditions()
+        {
+            // To finish the cycle, get victory conditions and run all and every single one of them
+            if (blueprintVictoryConditions.Count == 0)
+                BailExecution(new InvalidOperationException($"Room {ID} was initialized without victory conditions"));
+
+            if (currentAction == null)
+            {
+                List<int> winners = new List<int>();
+                    
+                foreach (var victoryCondition in blueprintVictoryConditions)
+                {
+                    if (!(victoryCondition.Type == ActionType.PlayerWins ^ victoryCondition.Type == ActionType.PlayersWins ))
+                        BailExecution(new InvalidOperationException($"Attempted to win a game via an argument which does not denote victory {victoryCondition.Type}"));
+                        
+                    var usableVictoryCondition = victoryCondition.Clone();
+
+                    var condition = usableVictoryCondition.Conditional ??
+                                    usableVictoryCondition.Arguments.First(a =>
+                                        a.Type.ReturnType() == ArgumentReturnType.Comparison);
+
+                    if (InterpretConditional(condition) && ReplaceArgument(usableVictoryCondition.Arguments[0], out var result) && result != null && result.Result.Count > 0)
+                        winners.AddRange(result.Result);
+                }
+                    
+                if (winners.Count > 0)
+                    WinningPlayersIndexes = winners;
+            }
+
+            return HasEnded;
         }
 
         /// <summary>
