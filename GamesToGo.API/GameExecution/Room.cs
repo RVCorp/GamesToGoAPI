@@ -542,7 +542,7 @@ namespace GamesToGo.API.GameExecution
                 case ActionType.AddCardTypeToFirstFreeTileInTileChosenByPlayer:
                 {
                     float tileColumn = CurrentTiles[currentAction.Arguments[1].Result[0]].Arrangement.X;
-                    var tile = CurrentTiles.Values.Where(t => t.Arrangement.X == tileColumn).OrderBy(t => t.Arrangement.X).First();
+                    var tile = CurrentTiles.Values.Where(t => t.Arrangement.X == tileColumn).OrderBy(t => t.Arrangement.X).First(t => t.Cards.Count == 0);
                     var card = blueprintCards[currentAction.Arguments[0].Result[0]].CloneEmpty(++latestCardID);
                     
                     tile.Cards.Add(card);
