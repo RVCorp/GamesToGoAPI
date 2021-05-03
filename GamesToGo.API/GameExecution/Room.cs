@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
@@ -716,44 +716,6 @@ namespace GamesToGo.API.GameExecution
                     return true;
                 }
                 
-                case ArgumentType.TileWithNoCardsSelectedByPlayer:
-                case ArgumentType.PlayerChosenByPlayer:
-                {
-                    if (UserActionArgument != null)
-                    {
-                        if (UserActionArgument.Type != argument.Type)
-                            BailExecution(new InvalidOperationException($"{nameof(UserActionArgument)} was not null when an argument of type different to it was reached"));
-
-                        if (UserActionArgument.Result[0] != -1)
-                        {
-                            result = new ArgumentParameter
-                            {
-                                Type = ArgumentType.DefaultArgument,
-                                Result = new List<int>
-                                {
-                                    UserActionArgument.Result[0],
-                                },
-                            };
-
-                            UserActionArgument = null;
-                            
-                            return true;
-                        }
-
-                        result = argument;
-
-                        return false;
-                    }
-
-                    UserActionArgument = argument.Clone();
-                    
-                    UserActionArgument.Result.Add(-1);
-
-                    result = UserActionArgument.Clone();
-
-                    return replacedAtLeastOne;
-                }
-                
                 case ArgumentType.CompareDirectionHasXTilesWithCards:
                 {
                     var tile = CurrentTiles[argument.Arguments[2].Result[0]];
@@ -847,6 +809,58 @@ namespace GamesToGo.API.GameExecution
                         },
                     };
                     return true;
+                }
+                
+                // Arguments that need the user
+                
+                case ArgumentType.TileWithNoCardsSelectedByPlayer:
+                case ArgumentType.PlayerChosenByPlayer:
+                {
+                    if (UserActionArgument != null)
+                    {
+                        if (UserActionArgument.Type != argument.Type)
+                            BailExecution(new InvalidOperationException($"{nameof(UserActionArgument)} was not null when an argument of type different to it was reached"));
+
+                        if (UserActionArgument.Result[0] != -1)
+                        {
+                            result = new ArgumentParameter
+                            {
+                                Type = ArgumentType.DefaultArgument,
+                                Result = new List<int>
+                                {
+                                    UserActionArgument.Result[0],
+                                },
+                            };
+
+                            UserActionArgument = null;
+                            
+                            return true;
+                        }
+
+                        result = argument;
+
+                        return false;
+                    }
+
+                    switch (argument.Type)
+                    {
+                        case ArgumentType.TileWithNoCardsSelectedByPlayer:
+                        {
+                            if (CurrentTiles.Values.Any(t => t.Cards.Count == 0))
+                                break;
+                            WinningPlayersIndexes = new List<int>();
+                            result = null;
+                            return true;
+                        }
+                    }
+
+                    UserActionArgument = argument.Clone();
+                    
+                    UserActionArgument.Result.Add(-1);
+
+                    result = UserActionArgument.Clone();
+
+                    return replacedAtLeastOne;
                 }
 
                 default:
