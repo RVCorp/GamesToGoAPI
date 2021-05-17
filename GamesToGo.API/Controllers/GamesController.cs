@@ -7,6 +7,7 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using GamesToGo.API.Extensions;
+using GamesToGo.API.GameExecution;
 using GamesToGo.API.Models;
 using GamesToGo.API.Models.File;
 
@@ -159,9 +160,9 @@ namespace GamesToGo.API.Controllers
             game.Image = image;
             game.LastEdited = le;
 
-            game.Status = 3;
-
             await Context.SaveChangesAsync();
+
+            game.Status = new GameParser().Parse(await System.IO.File.ReadAllLinesAsync($"Games/{game.Hash}")) == ParsingError.Ok ? 3 : 2;
             
             return Ok(new { ID = game.Id, game.Status });
         }

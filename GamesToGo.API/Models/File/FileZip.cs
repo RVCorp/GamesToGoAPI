@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Http;
+// ReSharper disable InconsistentNaming
 
 namespace GamesToGo.API.Models.File
 {
