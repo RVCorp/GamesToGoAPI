@@ -13,15 +13,13 @@ namespace GamesToGo.API.Extensions
             using var hasher = new SHA256Managed();
             return hasher.ComputeHash(bytes).ToHashString();
         }
-        
-        public static string SHA1(this string text) => Encoding.Unicode.GetBytes(text).SHA1();
 
         public static string SHA1(this byte[] bytes) //Obtiene SHA1 de una secuencia de bytes
         {
             using var hasher = new SHA1Managed();
             return hasher.ComputeHash(bytes).ToHashString();
         }
-        
-        public static string ToHashString(this byte[] bytes) => string.Concat(bytes.Select(by => by.ToString("X2")));
+
+        private static string ToHashString(this byte[] bytes) => string.Concat(bytes.Select(by => by.ToString("X2")));
     }
 }
